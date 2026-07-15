@@ -19,11 +19,15 @@ def format_datetime(val):
 def upload_proposal():
     try:
         client_name = request.form.get("client_name")
-        project_duration = request.form.get("project_duration", "12 Weeks")
-        budget = request.form.get("budget", "$200,000")
+        project_duration = request.form.get("project_duration")
+        budget = request.form.get("budget")
         
-        if not client_name:
-            return jsonify({"error": "Client name is required"}), 400
+        if not client_name or client_name.strip() == "":
+            client_name = "Extracting Client Name..."
+        if not project_duration or project_duration.strip() == "":
+            project_duration = "Extracting..."
+        if not budget or budget.strip() == "":
+            budget = "Extracting..."
             
         # Parse files if any
         uploaded_files = []
