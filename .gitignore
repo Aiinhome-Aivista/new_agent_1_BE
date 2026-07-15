@@ -1,0 +1,11 @@
+# To ignore virtual environment folders
+venv/
+env/
+ENV/
+
+# To ignore sensitive information 
+.env
+
+# To ignore Python bytecode and cache files
+__pycache__/
+*.py[cod]
