@@ -33,8 +33,8 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
         payload["response_format"] = {"type": "json_object"}
         
     try:
-        # 120 second timeout to allow sufficient inference time for local 24B model
-        response = requests.post(url, json=payload, headers=headers, timeout=120)
+        # 300 second timeout to allow sufficient inference/loading time for local 24B model
+        response = requests.post(url, json=payload, headers=headers, timeout=300)
         if response.status_code == 200:
             res_json = response.json()
             choices = res_json.get("choices", [])

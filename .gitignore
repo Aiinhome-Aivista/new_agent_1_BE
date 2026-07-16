@@ -2,7 +2,7 @@
 venv/
 env/
 ENV/
-
+static/
 # To ignore sensitive information 
 .env
 
