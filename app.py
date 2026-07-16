@@ -15,6 +15,10 @@ app = Flask(__name__)
 # Enable CORS for React dev server (usually localhost:5173)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+@app.route('/')
+def health_check():
+    return jsonify({"message": "Server is running!"}), 200
+
 # Serve static files (uploads and generated presentations)
 @app.route('/static/<path:path>')
 def serve_static(path):
