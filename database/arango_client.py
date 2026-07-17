@@ -158,6 +158,30 @@ class ArangoDBClient:
         except Exception as e:
             print(f"ArangoDB insert error: {e}")
             return False
+            
+    def upsert_document(self, collection, doc_key, document):
+        try:
+            from database.vector_client import get_embedding
+            text_to_embed = f"{document.get('name', '')} {document.get('description', '')} {document.get('capabilities', '')}"
+            document["embedding"] = get_embedding(text_to_embed)
+            document["_key"] = doc_key
+            
+            aql = f"""
+            UPSERT {{ _key: @doc_key }}
+            INSERT @doc
+            UPDATE @doc
+            IN @@collection
+            """
+            bind_vars = {
+                "doc_key": doc_key,
+                "doc": document,
+                "@collection": collection
+            }
+            self.query(aql, bind_vars)
+            return True
+        except Exception as e:
+            print(f"ArangoDB upsert error: {e}")
+            return False
 
 # Export initialized client
 arango_client = ArangoDBClient()
