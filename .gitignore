@@ -3,6 +3,7 @@ venv/
 env/
 ENV/
 static/
+chromadb_store/
 # To ignore sensitive information 
 .env
 
