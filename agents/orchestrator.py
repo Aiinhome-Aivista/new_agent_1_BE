@@ -7,6 +7,41 @@ from database.db_connection import get_db_connection
 from utils.pptx_generator import generate_pptx
 from utils.llm_client import query_llm
 from utils.doc_extractor import extract_text
+from database.arango_client import arango_client
+from database.vector_client import get_embedding, retrieve_nearest, cosine_similarity
+
+def chunk_text(text, chunk_size=1000, overlap=100):
+    """Splits document text into overlapping blocks of characters."""
+    if not text:
+        return []
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = start + chunk_size
+        chunks.append(text[start:end])
+        start += (chunk_size - overlap)
+    return chunks
+
+def classify_chunk(chunk_content):
+    """Queries Mistral to classify the document chunk."""
+    sys_prompt = (
+        "You are an assistant that classifies document sections from an RFP.\n"
+        "Classify the text into exactly one of these labels:\n"
+        "- Background\n"
+        "- Requirements\n"
+        "- Financial & Sizing\n"
+        "- Compliance & Security\n"
+        "- Other\n"
+        "Respond ONLY with the selected label (e.g. 'Requirements'). No markdown, punctuation or explanation."
+    )
+    res = query_llm(sys_prompt, chunk_content[:1500])
+    if res:
+        clean = res.strip().strip("'\"`").strip()
+        for cat in ["Background", "Requirements", "Financial & Sizing", "Compliance & Security", "Other"]:
+            if cat.lower() in clean.lower():
+                return cat
+    return "Other"
+
 
 # Define the step list in order
 STEPS = [
@@ -174,7 +209,14 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         # ----------------------------------------------------
         update_step_status(proposal_id, "Ingesting", "running", "Ingesting client documents: validating format & extracting text...")
         
+        # Initialize ArangoDB connection and schema setup
+        print("Initializing ArangoDB client...")
+        arango_client.init_db()
+        
         extracted_text_blocks = []
+        parsed_files = 0
+        total_chunks_stored = 0
+        
         if files_info:
             for file_data in files_info:
                 saved_path = file_data.get("saved_path")
@@ -182,7 +224,36 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                 if saved_path and os.path.exists(saved_path):
                     txt = extract_text(saved_path)
                     if txt:
+                        parsed_files += 1
                         extracted_text_blocks.append(f"--- Document: {orig_name} ---\n{txt}")
+                        
+                        # Smart Chunking and Classification
+                        chunks = chunk_text(txt, chunk_size=1000, overlap=100)
+                        for idx, chunk in enumerate(chunks):
+                            classification = classify_chunk(chunk)
+                            embedding = get_embedding(chunk)
+                            
+                            # Save to ArangoDB chunks collection
+                            if arango_client.is_connected:
+                                chunk_doc = {
+                                    "proposal_id": proposal_id,
+                                    "filename": orig_name,
+                                    "chunk_index": idx,
+                                    "text": chunk,
+                                    "classification": classification,
+                                    "embedding": embedding
+                                }
+                                arango_client.insert("chunks", chunk_doc)
+                                total_chunks_stored += 1
+                        
+                        # Save document record to ArangoDB
+                        if arango_client.is_connected:
+                            doc_record = {
+                                "proposal_id": proposal_id,
+                                "filename": orig_name,
+                                "character_count": len(txt)
+                            }
+                            arango_client.insert("documents", doc_record)
         
         full_document_text = "\n\n".join(extracted_text_blocks).strip()
         
@@ -234,7 +305,18 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             # Update the database with the extracted metadata
             update_proposal_metadata(proposal_id, client_name, project_duration, budget)
 
-        logs = f"Parsed {len(files_info)} document(s). Extracted and preprocessed {len(full_document_text)} characters."
+        # Save proposal metadata to ArangoDB
+        if arango_client.is_connected:
+            prop_record = {
+                "_key": proposal_id,
+                "client_name": client_name,
+                "project_duration": project_duration,
+                "budget": budget,
+                "status": "Ingesting"
+            }
+            arango_client.insert("proposals", prop_record)
+
+        logs = f"Parsed {parsed_files} document(s). Generated and indexed {total_chunks_stored} text chunks in ArangoDB."
         update_step_status(proposal_id, "Ingesting", "completed", logs)
 
         # ----------------------------------------------------
@@ -265,55 +347,87 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         if not isinstance(requirements, list) or len(requirements) == 0:
             requirements = default_requirements
 
-        # Fetch knowledge assets for RAG
-        conn = get_db_connection()
-        cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM knowledge_assets")
-        all_assets = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        # Fetch knowledge assets for RAG grounding
+        all_assets = []
+        if arango_client.is_connected:
+            aql = "FOR a IN knowledge_assets RETURN a"
+            all_assets = arango_client.query(aql)
         
-        assets_context_str = json.dumps([
-            {"name": a["name"], "category": a["category"], "description": a["description"], "capabilities": a["capabilities"]}
-            for a in all_assets
-        ])
+        # Fallback to SQLite knowledge assets if ArangoDB is empty or offline
+        if not all_assets:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT * FROM knowledge_assets")
+            all_assets = cursor.fetchall()
+            cursor.close()
+            conn.close()
+
+        matched_assets = []
+        gaps = []
         
-        # RAG Mapping Prompt
+        # Vector RAG capability mapping using cosine similarity
+        for req in requirements:
+            req_emb = get_embedding(req)
+            best_asset = None
+            best_sim = -1.0
+            
+            for asset in all_assets:
+                asset_emb = asset.get("embedding")
+                if not asset_emb:
+                    asset_emb = get_embedding(f"{asset.get('name', '')} {asset.get('description', '')}")
+                    asset["embedding"] = asset_emb
+                
+                sim = cosine_similarity(req_emb, asset_emb)
+                if sim > best_sim:
+                    best_sim = sim
+                    best_asset = asset
+            
+            if best_asset and best_sim >= 0.40:
+                matched_assets.append({
+                    "requirement": req,
+                    "asset_name": best_asset.get("name"),
+                    "category": best_asset.get("category"),
+                    "description": best_asset.get("description")
+                })
+            else:
+                # LLM-guided Gap Mitigation
+                gap_mitigation_sys = (
+                    "You are a pre-sales consultant. Given a client requirement that we cannot fully "
+                    "meet with existing assets, write exactly one sentence of mitigation (e.g. recruit a specialist "
+                    "contractor or establish a new competence program)."
+                )
+                gap_mitigation_user = f"Requirement: {req}"
+                mitigation = query_llm(gap_mitigation_sys, gap_mitigation_user)
+                if not mitigation:
+                    mitigation = "Address through temporary external contractor recruitment."
+                gaps.append(f"Identified gap in Client Requirement: '{req}'. Mitigation: {mitigation.strip()}")
+
+        if not gaps:
+            gaps = ["No critical knowledge capability gaps identified. Full alignment with PwC competencies."]
+
+        # Combine vector RAG matches and gaps for final LLM confirmation
         rag_sys_prompt = (
             "You are a technical consultant mapping client requirements to organization capabilities.\n"
-            "Given client requirements and our knowledge assets/competencies, map each requirement "
-            "to a capability. For any requirements that cannot be matched to our assets, identify them "
-            "as gaps and provide a mitigation plan.\n"
+            "Review the requirement mappings and identified gaps, and compile them into a clean JSON structure.\n"
             "Respond ONLY as a JSON object with two keys:\n"
             "- 'matched': a list of objects, each containing: 'requirement', 'asset_name', 'category', 'description'\n"
             "- 'gaps': a list of strings representing the identified gaps and mitigations.\n"
-            "Do not include any text before or after the JSON."
+            "Do not include any markdown format blocks or introductory text."
         )
-        rag_user_prompt = f"Requirements:\n{json.dumps(requirements)}\n\nKnowledge Assets:\n{assets_context_str}"
+        rag_user_prompt = f"Requirements: {json.dumps(requirements)}\nMapped Assets: {json.dumps(matched_assets)}\nGaps List: {json.dumps(gaps)}"
         
         rag_mapped_raw = query_llm(rag_sys_prompt, rag_user_prompt, json_mode=True)
-        if rag_mapped_raw is None:
-            raise RuntimeError("Failed to connect to local Mistral LLM server for RAG capability matching.")
-        
-        # Match using database keywords if LLM failed
-        db_matched, db_unmatched = query_rag_assets(requirements)
-        db_gaps = []
-        for r in db_unmatched:
-            db_gaps.append(f"Identified gap in Client Requirement: '{r}'. Mitigation: Align with external consultants.")
-        if not db_gaps:
-            db_gaps = ["No critical knowledge capability gaps identified. Full alignment with PwC competencies."]
-            
         default_rag = {
-            "matched": db_matched,
-            "gaps": db_gaps
+            "matched": matched_assets,
+            "gaps": gaps
         }
-        
         rag_data = safe_json_loads(rag_mapped_raw, default_rag)
-        matched = rag_data.get("matched", db_matched)
-        gaps = rag_data.get("gaps", db_gaps)
+        matched = rag_data.get("matched", matched_assets)
+        gaps = rag_data.get("gaps", gaps)
         
-        logs = f"RAG grounding completed. Mapped {len(matched)} requirements. Found {len(gaps)} potential gaps / mitigations."
+        logs = f"RAG Grounding complete: Mapped {len(matched)} requirement(s) to assets. Flagged {len(gaps)} gap(s)."
         update_step_status(proposal_id, "Analyzing", "completed", logs)
+
 
         # ----------------------------------------------------
         # 3. SOLUTION DESIGN AGENT (Tree-of-Thoughts Architecture)

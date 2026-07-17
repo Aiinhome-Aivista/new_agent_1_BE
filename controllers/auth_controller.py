@@ -31,7 +31,7 @@ def login():
             }), 200
         else:
             # Support fallback for offline/no database mode
-            if username == "admin" and password == "password":
+            if username == "admin" and password == "password123":
                 return jsonify({
                     "token": "mock-jwt-token-for-admin-fallback",
                     "user": {
@@ -43,7 +43,7 @@ def login():
             return jsonify({"error": "Invalid username or password"}), 401
     except Exception as e:
         # DB may not be reachable, fallback
-        if username == "admin" and password == "password":
+        if username == "admin" and password == "password123":
             return jsonify({
                 "token": "mock-jwt-token-for-admin-fallback",
                 "user": {

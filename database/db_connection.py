@@ -134,7 +134,11 @@ def init_sqlite_db():
     # Seed default user if empty
     cursor.execute("SELECT id FROM users WHERE username = 'admin'")
     if not cursor.fetchone():
-        cursor.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'password123', 'admin')")
+        cursor.execute("INSERT INTO users (username, password, role) VALUES ('admin', 'password', 'admin')")
+        cursor.execute("INSERT INTO users (username, password, role) VALUES ('presales', 'password', 'presales')")
+        cursor.execute("INSERT INTO users (username, password, role) VALUES ('bidmanager', 'password', 'bidmanager')")
+        cursor.execute("INSERT INTO users (username, password, role) VALUES ('delivery', 'password', 'delivery')")
+        cursor.execute("INSERT INTO users (username, password, role) VALUES ('partner', 'password', 'partner')")
         
     # Seed knowledge assets if empty
     cursor.execute("SELECT id FROM knowledge_assets")
@@ -179,6 +183,21 @@ def init_db():
                 cmd = command.strip()
                 if cmd:
                     cursor.execute(cmd)
+            conn.commit()
+            
+            # --- Safely run migrations (ADD COLUMN IF NOT EXISTS equivalent for MySQL) ---
+            try:
+                cursor.execute("ALTER TABLE proposals ADD COLUMN submitted_by_role VARCHAR(50) NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: # 1060 = Duplicate column name
+                    print(f"Migration error (submitted_by_role): {err}")
+                    
+            try:
+                cursor.execute("ALTER TABLE proposals ADD COLUMN last_transitioned_at TIMESTAMP NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060:
+                    print(f"Migration error (last_transitioned_at): {err}")
+                    
             conn.commit()
             print("MySQL database initialized successfully.")
         else:

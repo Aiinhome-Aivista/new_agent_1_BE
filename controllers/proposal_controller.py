@@ -203,3 +203,234 @@ def download_proposal_pptx(proposal_id):
             
     except Exception as e:
         return jsonify({"error": f"Failed to send file: {str(e)}"}), 500
+
+def transition_proposal_status(proposal_id):
+    """Enforce a strict role-based state machine for proposal business workflow.
+    
+    Allowed transitions:
+      Complete        → Draft           (presales, bidmanager, admin)
+      Draft           → DeliveryReview  (presales, bidmanager, admin)
+      DeliveryReview  → PartnerReview   (delivery, admin)
+      PartnerReview   → Approved        (partner, admin)
+      PartnerReview   → Draft           (partner, admin — Reject/back for revision)
+      Approved        → Published       (partner, admin)
+    """
+    try:
+        data = request.get_json() or {}
+        new_status = data.get("status")
+        user_role = data.get("user_role", "").strip()
+        
+        if not new_status:
+            return jsonify({"error": "Status is required"}), 400
+        if not user_role:
+            return jsonify({"error": "user_role is required"}), 400
+            
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT status FROM proposals WHERE id = %s", (proposal_id,))
+        prop = cursor.fetchone()
+        
+        if not prop:
+            cursor.close()
+            conn.close()
+            return jsonify({"error": "Proposal not found"}), 404
+            
+        current_status = prop["status"]
+        
+        # -------------------------------------------------------
+        # TRANSITION STATE MACHINE
+        # Keys: (from_status, to_status) → allowed_roles tuple
+        # -------------------------------------------------------
+        ALLOWED_TRANSITIONS = {
+            # AI pipeline complete → proposal enters business workflow as Draft
+            ("Complete",        "Draft"):          ("presales", "bidmanager", "admin"),
+            # Pre-Sales / Bid Manager submits to Delivery Lead
+            ("Draft",           "DeliveryReview"): ("presales", "bidmanager", "admin"),
+            # Delivery Lead is satisfied, submits to Reviewing Partner
+            ("DeliveryReview",  "PartnerReview"):  ("delivery", "admin"),
+            # Partner approves
+            ("PartnerReview",   "Approved"):       ("partner", "admin"),
+            # Partner rejects — sends back for revision to Pre-Sales/Bid Manager
+            ("PartnerReview",   "Draft"):          ("partner", "admin"),
+            # Partner publishes after approval
+            ("Approved",        "Published"):      ("partner", "admin"),
+        }
+        
+        transition_key = (current_status, new_status)
+        allowed_roles_for_transition = ALLOWED_TRANSITIONS.get(transition_key)
+        
+        if allowed_roles_for_transition is None:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "error": f"Transition from '{current_status}' to '{new_status}' is not a valid workflow step."
+            }), 400
+        
+        if user_role not in allowed_roles_for_transition:
+            cursor.close()
+            conn.close()
+            return jsonify({
+                "error": f"Role '{user_role}' cannot transition from '{current_status}' to '{new_status}'. "
+                         f"Allowed roles: {list(allowed_roles_for_transition)}"
+            }), 403
+            
+        # Perform status update, record who made the transition and when
+        cursor.execute(
+            "UPDATE proposals SET status = %s, submitted_by_role = %s, last_transitioned_at = NOW() WHERE id = %s",
+            (new_status, user_role, proposal_id)
+        )
+        
+        # Add human-readable log entry to proposal_steps for audit trail
+        action_labels = {
+            ("Complete",       "Draft"):         "Proposal moved to Draft for review",
+            ("Draft",          "DeliveryReview"):"Submitted to Delivery Lead for feasibility review",
+            ("DeliveryReview", "PartnerReview"): "Delivery review complete. Submitted to Reviewing Partner",
+            ("PartnerReview",  "Approved"):      "Partner APPROVED the proposal",
+            ("PartnerReview",  "Draft"):         "Partner REJECTED — returned for revision",
+            ("Approved",       "Published"):     "Proposal PUBLISHED and finalized",
+        }
+        log_msg = action_labels.get(transition_key, f"Status moved from {current_status} to {new_status}")
+        
+        cursor.execute(
+            "INSERT INTO proposal_steps (proposal_id, step_name, status, log_message) VALUES (%s, %s, %s, %s)",
+            (proposal_id, new_status, "completed", f"[{user_role.upper()}] {log_msg}")
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        return jsonify({"message": f"Proposal successfully transitioned to '{new_status}'"}), 200
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def get_users():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT id, username, role, created_at FROM users ORDER BY username")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        for r in rows:
+            if r.get("created_at"):
+                r["created_at"] = format_datetime(r["created_at"])
+        return jsonify(rows), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def change_user_role():
+    try:
+        data = request.get_json() or {}
+        username = data.get("username")
+        new_role = data.get("role")
+        
+        if not username or not new_role:
+            return jsonify({"error": "Username and role are required"}), 400
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET role = %s WHERE username = %s", (new_role, username))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return jsonify({"message": f"User {username} role updated to {new_role}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def get_admin_config():
+    try:
+        from database.arango_client import arango_client
+        arango_status = "Online" if arango_client.is_connected else "Offline"
+        
+        conn = get_db_connection()
+        mysql_status = "Online" if conn.mysql_conn else "Offline (Using Local SQLite Mirror)"
+        conn.close()
+        
+        config_data = {
+            "mysql_status": mysql_status,
+            "arango_status": arango_status,
+            "arango_url": os.getenv("ARANGO_URL"),
+            "arango_db": os.getenv("ARANGO_DB"),
+            "mistral_url": os.getenv("MISTRAL_LOCAL_URL"),
+            "active_ai_model": os.getenv("MISTRAL_LOCAL_MODEL", "mistral-small:24b"),
+        }
+        return jsonify(config_data), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def get_all_audit_logs():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT s.proposal_id, p.client_name, s.step_name, s.status, s.log_message, s.updated_at 
+            FROM proposal_steps s 
+            JOIN proposals p ON s.proposal_id = p.id 
+            ORDER BY s.updated_at DESC
+        """)
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        for r in rows:
+            if r.get("updated_at"):
+                r["updated_at"] = format_datetime(r["updated_at"])
+        return jsonify(rows), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def retry_proposal_job(proposal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT client_name, project_duration, budget FROM proposals WHERE id = %s", (proposal_id,))
+        prop = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not prop:
+            return jsonify({"error": "Proposal not found"}), 404
+            
+        client_name = prop["client_name"]
+        project_duration = prop["project_duration"]
+        budget = prop["budget"]
+        
+        # Reset steps
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM proposal_steps WHERE proposal_id = %s", (proposal_id,))
+        cursor.execute("UPDATE proposals SET status = %s WHERE id = %s", ("Ingesting", proposal_id))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Trigger job async
+        trigger_proposal_job(
+            proposal_id=proposal_id,
+            client_name=client_name,
+            project_duration=project_duration,
+            budget=budget,
+            files_info=[] # Clean retry
+        )
+        return jsonify({"message": f"Job retry triggered for proposal {proposal_id}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def update_ai_model():
+    try:
+        data = request.get_json() or {}
+        model_name = data.get("model_name")
+        if not model_name:
+            return jsonify({"error": "Model name is required"}), 400
+            
+        # Update environment variable
+        os.environ["MISTRAL_LOCAL_MODEL"] = model_name
+        import utils.llm_client
+        import database.vector_client
+        utils.llm_client.MISTRAL_LOCAL_MODEL = model_name
+        database.vector_client.MISTRAL_LOCAL_MODEL = model_name
+        
+        return jsonify({"message": f"Active AI Model updated to {model_name}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
