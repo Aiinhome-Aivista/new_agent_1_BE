@@ -78,3 +78,21 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
     except Exception as e:
         print(f"Error connecting to Mistral LLM server at {MISTRAL_LOCAL_URL}: {e}")
         return None
+
+def safe_json_loads(json_str, fallback):
+    """
+    Safely parses JSON string, removing any markdown code blocks if present.
+    Returns fallback if parsing fails.
+    """
+    if not json_str:
+        return fallback
+    try:
+        # Sometimes LLMs wrap json in markdown blocks like ```json ... ```
+        if "```json" in json_str:
+            json_str = json_str.split("```json")[1].split("```")[0].strip()
+        elif "```" in json_str:
+            json_str = json_str.split("```")[1].split("```")[0].strip()
+        return json.loads(json_str)
+    except Exception as e:
+        print(f"JSON parsing error: {e}")
+        return fallback

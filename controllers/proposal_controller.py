@@ -417,6 +417,61 @@ def retry_proposal_job(proposal_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+def get_tech_options():
+    try:
+        from utils.pricing_kb import get_technology_options
+        return jsonify(get_technology_options()), 200
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def calculate_budget():
+    try:
+        data = request.get_json() or {}
+        ui_tech = data.get("ui_tech", "")
+        backend_tech = data.get("backend_tech", "")
+        db_tech = data.get("db_tech", "")
+        
+        from utils.pricing_kb import calculate_budget as calc_budget
+        budget_info = calc_budget(ui_tech, backend_tech, db_tech)
+        return jsonify(budget_info), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+def resume_proposal(proposal_id):
+    try:
+        data = request.get_json() or {}
+        ui_tech = data.get("ui_tech", "React")
+        backend_tech = data.get("backend_tech", "Flask")
+        db_tech = data.get("db_tech", "MySQL")
+        final_budget = data.get("formatted_budget", "$250,000")
+        
+        # Synchronously update status and budget to prevent race conditions on the frontend
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE proposals SET status = 'Designing', budget = %s WHERE id = %s",
+            (final_budget, proposal_id)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        from agents.orchestrator import resume_orchestration_phase2
+        import threading
+        
+        thread = threading.Thread(
+            target=resume_orchestration_phase2,
+            args=(proposal_id, ui_tech, backend_tech, db_tech, final_budget)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({"message": f"Resumed orchestration for {proposal_id} with new budget {final_budget}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 def update_ai_model():
     try:
         data = request.get_json() or {}
