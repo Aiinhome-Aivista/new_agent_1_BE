@@ -229,13 +229,17 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                         
                         # Smart Chunking and Classification
                         chunks = chunk_text(txt, chunk_size=1000, overlap=100)
+                        from database.vector_client import store_embedding
                         for idx, chunk in enumerate(chunks):
                             classification = classify_chunk(chunk)
                             embedding = get_embedding(chunk)
                             
+                            chunk_id = f"{proposal_id}_{orig_name}_{idx}"
+                            
                             # Save to ArangoDB chunks collection
                             if arango_client.is_connected:
                                 chunk_doc = {
+                                    "_key": chunk_id,
                                     "proposal_id": proposal_id,
                                     "filename": orig_name,
                                     "chunk_index": idx,
@@ -244,7 +248,20 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                                     "embedding": embedding
                                 }
                                 arango_client.insert("chunks", chunk_doc)
-                                total_chunks_stored += 1
+                            
+                            # Save to ChromaDB
+                            store_embedding(
+                                collection_name="chunks",
+                                doc_id=chunk_id,
+                                text=chunk,
+                                metadata={
+                                    "proposal_id": proposal_id,
+                                    "filename": orig_name,
+                                    "classification": classification
+                                }
+                            )
+                            
+                            total_chunks_stored += 1
                         
                         # Save document record to ArangoDB
                         if arango_client.is_connected:
@@ -284,19 +301,19 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                 raise RuntimeError("Failed to connect to local Mistral LLM server for metadata extraction (read timeout/offline).")
             extracted_meta = safe_json_loads(meta_raw, {})
             if needs_client:
-                ext_client = extracted_meta.get("client_name", "").strip()
+                ext_client = str(extracted_meta.get("client_name") or "").strip()
                 if not ext_client or "Extracting" in ext_client:
                     client_name = "Acme Corporation"
                 else:
                     client_name = ext_client
             if needs_duration:
-                ext_duration = extracted_meta.get("project_duration", "").strip()
+                ext_duration = str(extracted_meta.get("project_duration") or "").strip()
                 if not ext_duration or "Extracting" in ext_duration:
                     project_duration = "14 Weeks"
                 else:
                     project_duration = ext_duration
             if needs_budget:
-                ext_budget = extracted_meta.get("budget", "").strip()
+                ext_budget = str(extracted_meta.get("budget") or "").strip()
                 if not ext_budget or "Extracting" in ext_budget:
                     budget = "$250,000"
                 else:
@@ -347,47 +364,21 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         if not isinstance(requirements, list) or len(requirements) == 0:
             requirements = default_requirements
 
-        # Fetch knowledge assets for RAG grounding
-        all_assets = []
-        if arango_client.is_connected:
-            aql = "FOR a IN knowledge_assets RETURN a"
-            all_assets = arango_client.query(aql)
-        
-        # Fallback to SQLite knowledge assets if ArangoDB is empty or offline
-        if not all_assets:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM knowledge_assets")
-            all_assets = cursor.fetchall()
-            cursor.close()
-            conn.close()
-
+        from database.vector_client import search_embeddings
         matched_assets = []
         gaps = []
         
-        # Vector RAG capability mapping using cosine similarity
+        # Vector RAG capability mapping using ChromaDB
         for req in requirements:
-            req_emb = get_embedding(req)
-            best_asset = None
-            best_sim = -1.0
+            results = search_embeddings("knowledge_assets", req, n_results=1)
             
-            for asset in all_assets:
-                asset_emb = asset.get("embedding")
-                if not asset_emb:
-                    asset_emb = get_embedding(f"{asset.get('name', '')} {asset.get('description', '')}")
-                    asset["embedding"] = asset_emb
-                
-                sim = cosine_similarity(req_emb, asset_emb)
-                if sim > best_sim:
-                    best_sim = sim
-                    best_asset = asset
-            
-            if best_asset and best_sim >= 0.40:
+            if results and len(results) > 0 and results[0]["similarity"] >= 0.40:
+                best_asset_meta = results[0]["metadata"]
                 matched_assets.append({
                     "requirement": req,
-                    "asset_name": best_asset.get("name"),
-                    "category": best_asset.get("category"),
-                    "description": best_asset.get("description")
+                    "asset_name": best_asset_meta.get("name", ""),
+                    "category": best_asset_meta.get("category", "Asset"),
+                    "description": best_asset_meta.get("description", "")
                 })
             else:
                 # LLM-guided Gap Mitigation
@@ -589,7 +580,12 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         
         out_dir = os.path.join(os.getcwd(), 'static', 'proposals')
         os.makedirs(out_dir, exist_ok=True)
-        file_name = f"proposal_{proposal_id}.pptx"
+        import re
+        safe_client_name = re.sub(r'[^a-zA-Z0-9]', '_', client_name).strip('_')
+        if not safe_client_name:
+            safe_client_name = "Project"
+            
+        file_name = f"{safe_client_name}_Proposal.pptx"
         file_path = os.path.join(out_dir, file_name)
         
         generate_pptx(final_ir_data, file_path)

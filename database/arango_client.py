@@ -126,13 +126,32 @@ class ArangoDBClient:
                 }
             ]
 
-            print("Seeding default knowledge assets to ArangoDB...")
+            print("Seeding default knowledge assets to ArangoDB and ChromaDB...")
+            from database.vector_client import get_embedding, store_embedding
+            import uuid
+            
             for asset in default_assets:
                 url = f"{self.base_url}/_db/{self.db}/_api/document/knowledge_assets"
-                # Seed with embeddings for vector search
-                from database.vector_client import get_embedding
-                asset["embedding"] = get_embedding(f"{asset['name']} {asset['description']}")
-                requests.post(url, auth=self.auth, json=asset)
+                
+                # Combine fields for embedding
+                text_to_embed = f"{asset['name']} {asset['description']} {asset.get('capabilities', '')}"
+                
+                # Compute embedding once and attach it for ArangoDB
+                emb = get_embedding(text_to_embed)
+                asset["embedding"] = emb
+                
+                res = requests.post(url, auth=self.auth, json=asset)
+                if res.status_code in [201, 202]:
+                    # Extract the ArangoDB _key to use as ChromaDB ID
+                    doc_key = res.json().get("_key", str(uuid.uuid4()))
+                    
+                    # Store in ChromaDB
+                    store_embedding(
+                        collection_name="knowledge_assets", 
+                        doc_id=doc_key, 
+                        text=text_to_embed, 
+                        metadata={"name": asset["name"], "category": asset["category"], "description": asset["description"]}
+                    )
         except Exception as e:
             print(f"ArangoDB seeding warning: {e}")
 
@@ -161,7 +180,7 @@ class ArangoDBClient:
             
     def upsert_document(self, collection, doc_key, document):
         try:
-            from database.vector_client import get_embedding
+            from database.vector_client import get_embedding, store_embedding
             text_to_embed = f"{document.get('name', '')} {document.get('description', '')} {document.get('capabilities', '')}"
             document["embedding"] = get_embedding(text_to_embed)
             document["_key"] = doc_key
@@ -178,6 +197,15 @@ class ArangoDBClient:
                 "@collection": collection
             }
             self.query(aql, bind_vars)
+            
+            # Sync to ChromaDB
+            store_embedding(
+                collection_name=collection, 
+                doc_id=doc_key, 
+                text=text_to_embed, 
+                metadata={"name": document.get("name", ""), "category": document.get("category", ""), "description": document.get("description", "")}
+            )
+            
             return True
         except Exception as e:
             print(f"ArangoDB upsert error: {e}")

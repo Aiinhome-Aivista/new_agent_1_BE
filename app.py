@@ -5,7 +5,7 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 
 # Load env variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Import controllers and db init
 from database.db_connection import init_db, get_db_connection
