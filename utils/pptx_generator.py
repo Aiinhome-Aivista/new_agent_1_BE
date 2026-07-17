@@ -312,9 +312,22 @@ def generate_pptx(data, output_path):
     add_footer(slide)
 
     # Table layout
-    rows = 6
+    resources = data.get("resources", [
+        {"role": "Engagement Partner", "loc": "Onsite", "fte": "0.25", "rate": "$30,000", "total": "$45,000"},
+        {"role": "Lead Architect", "loc": "Onsite / Hybrid", "fte": "1.00", "rate": "$24,000", "total": "$144,000"},
+        {"role": "Senior Frontend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000"},
+        {"role": "Senior Backend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000"},
+        {"role": "DevOps & Security Specialist", "loc": "Offshore", "fte": "1.00", "rate": "$9,000", "total": "$54,000"}
+    ])
+    
+    rows = len(resources) + 1
+    # Cap rows to fit on one slide
+    rows = min(rows, 9)
     cols = 5
-    table_shape = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(1.5), Inches(9.0), Inches(4.5))
+    
+    # Calculate a sensible height for the table depending on rows
+    table_height = Inches(0.4 * rows)
+    table_shape = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(1.5), Inches(9.0), table_height)
     table = table_shape.table
 
     # Column Widths
@@ -334,15 +347,7 @@ def generate_pptx(data, output_path):
         p.alignment = PP_ALIGN.CENTER
         set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
-    resources = data.get("resources", [
-        {"role": "Engagement Partner", "loc": "Onsite", "fte": "0.25", "rate": "$30,000", "total": "$45,000"},
-        {"role": "Lead Architect", "loc": "Onsite / Hybrid", "fte": "1.00", "rate": "$24,000", "total": "$144,000"},
-        {"role": "Senior Frontend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000"},
-        {"role": "Senior Backend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000"},
-        {"role": "DevOps & Security Specialist", "loc": "Offshore", "fte": "1.00", "rate": "$9,000", "total": "$54,000"}
-    ])
-
-    for i, res in enumerate(resources[:5]):
+    for i, res in enumerate(resources[:rows-1]):
         row_idx = i + 1
         cols_val = [res.get("role"), res.get("loc"), res.get("fte"), res.get("rate"), res.get("total")]
         for j, val in enumerate(cols_val):
@@ -361,9 +366,21 @@ def generate_pptx(data, output_path):
     create_slide_header(slide, "Skills Inventory & PwC Competency Mapping", "Required technical capabilities grounded in organizational assets")
     add_footer(slide)
 
-    rows = 6
-    cols = 4
-    table_shape2 = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(1.5), Inches(9.0), Inches(4.5))
+    skills_map = data.get("skills_mapping", [
+        {"skill": "React 18, TypeScript, Tailwind", "role": "Frontend Developer", "asset": "PwC Frontend Competency Center", "conf": "High (95%)"},
+        {"skill": "Flask API, Python Core", "role": "Backend Developer", "asset": "PwC Python/Data Competency Team", "conf": "High (90%)"},
+        {"skill": "MySQL Connector, RAG Store", "role": "Database Architect", "asset": "Enterprise Data Governance Framework", "conf": "Medium (85%)"},
+        {"skill": "python-pptx Engine", "role": "Orchestrator Agent", "asset": "PwC Proposal Creator Accelerator Asset", "conf": "High (95%)"},
+        {"skill": "CI/CD & DevOps", "role": "DevOps Engineer", "asset": "PwC DevOps Pipeline Accelerator", "conf": "High (98%)"}
+    ])
+    
+    rows2 = len(skills_map) + 1
+    # Cap rows to fit on one slide
+    rows2 = min(rows2, 9)
+    cols2 = 4
+    
+    table_height2 = Inches(0.4 * rows2)
+    table_shape2 = slide.shapes.add_table(rows2, cols2, Inches(0.5), Inches(1.5), Inches(9.0), table_height2)
     table2 = table_shape2.table
 
     table2.columns[0].width = Inches(2.2) # Skill Name
@@ -381,15 +398,7 @@ def generate_pptx(data, output_path):
         p.alignment = PP_ALIGN.CENTER
         set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
-    skills_map = data.get("skills_mapping", [
-        {"skill": "React 18, TypeScript, Tailwind", "role": "Frontend Developer", "asset": "PwC Frontend Competency Center", "conf": "High (95%)"},
-        {"skill": "Flask API, Python Core", "role": "Backend Developer", "asset": "PwC Python/Data Competency Team", "conf": "High (90%)"},
-        {"skill": "MySQL Connector, RAG Store", "role": "Database Architect", "asset": "Enterprise Data Governance Framework", "conf": "Medium (85%)"},
-        {"skill": "python-pptx Engine", "role": "Orchestrator Agent", "asset": "PwC Proposal Creator Accelerator Asset", "conf": "High (95%)"},
-        {"skill": "CI/CD & DevOps", "role": "DevOps Engineer", "asset": "PwC DevOps Pipeline Accelerator", "conf": "High (98%)"}
-    ])
-
-    for i, item in enumerate(skills_map[:5]):
+    for i, item in enumerate(skills_map[:rows2-1]):
         row_idx = i + 1
         cols_val = [item.get("skill"), item.get("role"), item.get("asset"), item.get("conf")]
         for j, val in enumerate(cols_val):
