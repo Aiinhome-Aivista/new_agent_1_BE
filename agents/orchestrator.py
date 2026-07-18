@@ -104,6 +104,11 @@ def update_proposal_status(proposal_id, status, file_path=None, json_ir=None):
                 "UPDATE proposals SET status = %s, generated_file_path = %s WHERE id = %s",
                 (status, file_path, proposal_id)
             )
+        elif json_ir:
+            cursor.execute(
+                "UPDATE proposals SET status = %s, structured_json_ir = %s WHERE id = %s",
+                (status, json_ir, proposal_id)
+            )
         else:
             cursor.execute(
                 "UPDATE proposals SET status = %s WHERE id = %s",
@@ -419,15 +424,59 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         logs = f"RAG Grounding complete: Mapped {len(matched)} requirement(s) to assets. Flagged {len(gaps)} gap(s)."
         update_step_status(proposal_id, "Analyzing", "completed", logs)
 
+        # PAUSE HERE: Save intermediate state to structured_json_ir so Phase 2 can pick it up.
+        partial_state = {
+            "client_name": client_name,
+            "project_duration": project_duration,
+            "budget": budget,
+            "requirements": requirements,
+            "matched_assets": matched,
+            "gaps": gaps
+        }
+        update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
+        
+        # Stop the thread. The UI will resume it by calling the resume endpoint.
+        return
+        
+    except Exception as e:
+        print(f"Error in multi-agent pipeline: {e}")
+        import traceback
+        tb = traceback.format_exc()
+        update_proposal_status(proposal_id, "Failed")
+        for step in STEPS:
+            update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
+def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, final_budget):
+    """Phase 2 of Orchestration: Designing, Planning, Assembling, PPTX rendering."""
+    try:
+        # Retrieve the partial state
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT structured_json_ir FROM proposals WHERE id = %s", (proposal_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row or not row.get("structured_json_ir"):
+            raise ValueError("No intermediate state found to resume.")
+            
+        partial_state = json.loads(row["structured_json_ir"])
+        client_name = partial_state.get("client_name", "Client")
+        project_duration = partial_state.get("project_duration", "14 Weeks")
+        budget = final_budget  # Override with user-selected budget
+        requirements = partial_state.get("requirements", [])
+        gaps = partial_state.get("gaps", [])
+        
         # ----------------------------------------------------
         # 3. SOLUTION DESIGN AGENT (Tree-of-Thoughts Architecture)
         # ----------------------------------------------------
-        update_step_status(proposal_id, "Designing", "running", "Designing technical solution architecture & pillars (Tree-of-Thoughts)...")
+        update_step_status(proposal_id, "Designing", "running", f"Designing technical solution using {ui_tech}, {backend_tech}, {db_tech}...")
         
         design_sys_prompt = (
-            "You are a Lead IT Architect. Based on client requirements, budget constraint, and duration, "
-            "propose a solution design containing 3 solution pillars and a landscape architecture table.\n"
+            f"You are a Lead IT Architect. Based on client requirements, budget constraint, and duration, "
+            f"propose a solution design containing 3 solution pillars and a landscape architecture table.\n"
+            f"CRITICAL INSTRUCTION: You must include {ui_tech} for the Frontend, {backend_tech} for the Backend, "
+            f"and {db_tech} for the Database in your architecture.\n"
             "Respond ONLY as a JSON object with the following keys:\n"
             "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (sentence detail).\n"
             "- 'architecture': a list of exactly 3 layers (e.g., 'Presentation layer (UI Client)', "
@@ -477,11 +526,13 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "'duration' (weeks range), and 'deliverables' (key activities/deliverables text).\n"
             "- 'resources': a list of exactly 5 resource roles. Each resource object contains: "
             "'role' (string), 'loc' ('Onsite', 'Offshore', 'Hybrid'), 'fte' (decimal string, e.g., '1.00', '0.25'), "
-            "'rate' (monthly rate string, e.g., '$8,000'), and 'total' (total cost calculation for this resource).\n"
+            "'rate' (monthly rate string, e.g., '$8,000'), and 'total' (total cost calculation for this resource as a string, e.g. '$10,000').\n"
             "- 'skills_mapping': a list of exactly 5 skills mapping objects. Each object contains: "
             "'skill' (technical skill name), 'role' (matching project role), 'asset' (matching PwC Asset/Competency name), "
             "and 'conf' (confidence percentage string, e.g. '95%').\n"
-            "Ensure that total calculations align with realistic industry values. Do not include formatting before or after the JSON."
+            f"CRITICAL: The sum of the 'total' cost for all resources MUST EXACTLY equal the target budget of {budget}. "
+            f"Convert {project_duration} to months to calculate (rate * fte * months = total), but adjust the numbers so the sum matches the budget perfectly.\n"
+            "Do not include formatting before or after the JSON."
         )
         plan_user_prompt = f"Requirements: {json.dumps(requirements)}\nBudget: {budget}\nDuration: {project_duration}"
         
@@ -567,6 +618,50 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             raise RuntimeError("Failed to connect to local Mistral LLM server for Reflexion validation.")
         final_ir_data = safe_json_loads(final_ir_raw, draft_ir)
         
+        # Python math override to ensure totals match budget
+        import re
+        try:
+            target_budget_str = str(budget).replace(',', '').replace('$', '').strip()
+            target_budget_val = float(target_budget_str)
+            
+            dur_match = re.search(r'(\d+)', str(project_duration))
+            weeks = float(dur_match.group(1)) if dur_match else 32.0
+            months = max(weeks / 4.0, 1.0)
+
+            resources_list = final_ir_data.get("resources", [])
+            total_current = 0.0
+            parsed_res = []
+            
+            for r in resources_list:
+                tot_str = str(r.get("total", "0")).replace(',', '').replace('$', '').strip()
+                try:
+                    tot_val = float(tot_str)
+                except:
+                    tot_val = 1000.0
+                total_current += tot_val
+                parsed_res.append(tot_val)
+                
+            if total_current > 0:
+                scale = target_budget_val / total_current
+                for i, r in enumerate(resources_list):
+                    new_tot = parsed_res[i] * scale
+                    try:
+                        fte_val = float(str(r.get("fte", "1.0")))
+                    except:
+                        fte_val = 1.0
+                    
+                    if fte_val > 0:
+                        new_rate = new_tot / (fte_val * months)
+                    else:
+                        new_rate = 0.0
+                        
+                    r["total"] = f"${int(new_tot):,}"
+                    r["rate"] = f"${int(new_rate):,}"
+                    
+            final_ir_data["resources"] = resources_list
+        except Exception as math_e:
+            print(f"Failed to normalize resource budget: {math_e}")
+            
         # Save JSON IR to database for review/edit
         json_ir_str = json.dumps(final_ir_data)
         

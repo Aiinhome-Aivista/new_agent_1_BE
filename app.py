@@ -98,6 +98,19 @@ def transition_proposal_status(proposal_id):
     # Role gate is enforced inside the controller (user_role from request body)
     return proposal_controller.transition_proposal_status(proposal_id)
 
+@app.route('/api/tech-options', methods=['GET'])
+def get_tech_options():
+    return proposal_controller.get_tech_options()
+
+@app.route('/api/proposals/calculate-budget', methods=['POST'])
+def calculate_budget():
+    return proposal_controller.calculate_budget()
+
+@app.route('/api/proposals/resume/<proposal_id>', methods=['POST'])
+@require_role('presales', 'bidmanager', 'admin')
+def resume_proposal(proposal_id):
+    return proposal_controller.resume_proposal(proposal_id)
+
 # ----------------------------------------------------
 # API ROUTES — Admin (admin only)
 # ----------------------------------------------------
@@ -161,26 +174,84 @@ def get_knowledge():
 @require_role('presales', 'admin')
 def add_knowledge():
     try:
-        data = request.get_json() or {}
-        name = data.get("name")
-        description = data.get("description")
-        category = data.get("category", "Asset")
-        capabilities = data.get("capabilities", "")
+        import os
+        from werkzeug.utils import secure_filename
+        from utils.doc_extractor import extract_text
+        from database.vector_client import store_embedding
         
-        if not name or not description:
-            return jsonify({"error": "Name and description are required"}), 400
+        # We expect a multipart/form-data upload with multiple files under the key "files"
+        if 'files' not in request.files:
+            return jsonify({"error": "No files provided"}), 400
             
+        files = request.files.getlist("files")
+        if not files or all(f.filename == '' for f in files):
+            return jsonify({"error": "No selected files"}), 400
+            
+        upload_dir = os.path.join(os.getcwd(), 'static', 'uploads', 'knowledge')
+        os.makedirs(upload_dir, exist_ok=True)
+        
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO knowledge_assets (name, description, category, capabilities) VALUES (%s, %s, %s, %s)",
-            (name, description, category, capabilities)
-        )
+        
+        # Connect to ArangoDB if available
+        arango = None
+        try:
+            from database.arango_client import arango_client
+            if arango_client.is_connected:
+                arango = arango_client
+        except Exception:
+            pass
+
+        processed_count = 0
+        
+        for file in files:
+            if file and file.filename:
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(upload_dir, filename)
+                file.save(filepath)
+                
+                # Extract text
+                extracted_text = extract_text(filepath)
+                description_snippet = extracted_text[:200] + "..." if len(extracted_text) > 200 else extracted_text
+                
+                # Insert into SQLite (Metadata)
+                cursor.execute(
+                    "INSERT INTO knowledge_assets (name, description, category, capabilities) VALUES (%s, %s, %s, %s)",
+                    (filename, description_snippet, "Document", "File Upload")
+                )
+                asset_id = cursor.lastrowid
+                
+                # Store in VectorDB (ChromaDB)
+                # Note: pricing_kb.py uses default collection for search, but wait, pricing_kb uses `search_embeddings` which doesn't take collection in the new version? Wait, let me check vector_client.py: `search_embeddings(collection_name, query, n_results=3)`
+                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": "Document", "description": description_snippet})
+                
+                # Store in GraphDB (ArangoDB)
+                if arango:
+                    try:
+                        arango.upsert_document(
+                            collection="knowledge_assets",
+                            doc_key=str(asset_id),
+                            document={
+                                "name": filename,
+                                "description": description_snippet,
+                                "category": "Document",
+                                "capabilities": "File Upload",
+                                "full_text": extracted_text
+                            }
+                        )
+                    except Exception as e:
+                        print(f"Failed to insert {filename} into ArangoDB: {e}")
+                
+                processed_count += 1
+                
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({"message": "Knowledge asset added successfully"}), 201
+        
+        return jsonify({"message": f"Successfully uploaded and indexed {processed_count} files"}), 201
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/knowledge/<int:asset_id>', methods=['PUT'])
