@@ -4,6 +4,7 @@ env/
 ENV/
 static/
 chroma_store/
+chromadb_store/
 # To ignore sensitive information 
 .env
 
