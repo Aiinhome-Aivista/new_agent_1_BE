@@ -96,3 +96,34 @@ def safe_json_loads(json_str, fallback):
     except Exception as e:
         print(f"JSON parsing error: {e}")
         return fallback
+
+def extract_pdf_metadata(text):
+    """
+    Uses the LLM to analyze the extracted text from a PDF/doc in the knowledge base.
+    Returns a dictionary with 'category', 'capabilities', and 'description'.
+    """
+    sys_prompt = (
+        "You are an assistant that analyzes technical documents or competencies.\n"
+        "Extract the following metadata from the text:\n"
+        "1. category: Must be exactly 'Asset' or 'Competency'. If the document describes a reusable tool, package, framework, template, or toolkit, classify as 'Asset'. If it describes team skills, services, capability profiles, or competencies, classify as 'Competency'.\n"
+        "2. capabilities: A comma-separated list of technical skills, programming languages, technologies, frameworks, libraries, databases, or tools mentioned in the document (e.g., 'React, TypeScript, Zustand, Tailwind CSS, Vite' or 'Python, Flask, PySpark, Airflow'). Keep them concise and distinct.\n"
+        "3. description: A 1-2 sentence summary of what the document or competency is about, highlighting any key deliverables or cost structure if mentioned.\n"
+        "Respond ONLY as a JSON object with these three keys. Do not include any explanation or markdown wrappers."
+    )
+    user_prompt = f"Document Text:\n\n{text[:4000]}"
+    try:
+        response = query_llm(sys_prompt, user_prompt, temperature=0.1, json_mode=True)
+        if response:
+            return safe_json_loads(response, {
+                "category": "Asset",
+                "capabilities": "File Upload",
+                "description": text[:200] + "..." if len(text) > 200 else text
+            })
+    except Exception as e:
+        print(f"Error extracting metadata from PDF: {e}")
+    return {
+        "category": "Asset",
+        "capabilities": "File Upload",
+        "description": text[:200] + "..." if len(text) > 200 else text
+    }
+

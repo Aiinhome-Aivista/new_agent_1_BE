@@ -2,47 +2,100 @@ import json
 from database.vector_client import search_embeddings
 from utils.llm_client import query_llm, safe_json_loads
 
-# Static list of technology names for the UI dropdowns.
-# No hardcoded costs here! The LLM determines the cost based on the vector knowledge base.
-TECH_OPTIONS = {
-    "ui": {
-        "react": {"label": "React.js"},
-        "angular": {"label": "Angular"},
-        "vue": {"label": "Vue.js"},
-        "html_vanilla": {"label": "Vanilla HTML/JS"}
-    },
-    "backend": {
-        "flask": {"label": "Flask (Python)"},
-        "django": {"label": "Django (Python)"},
-        "express": {"label": "Express (Node.js)"},
-        "spring": {"label": "Spring Boot (Java)"}
-    },
-    "database": {
-        "mysql": {"label": "MySQL"},
-        "postgres": {"label": "PostgreSQL"},
-        "mongodb": {"label": "MongoDB"},
-        "arango": {"label": "ArangoDB"}
-    }
-}
-
 def get_technology_options():
     """
-    Returns available technologies to populate the UI dropdowns.
+    Dynamically loads technology options by extracting and classifying capabilities
+    from the knowledge assets database. If no skills exist, returns empty lists.
     """
-    return {
-        "ui": [{"value": k, "label": v["label"]} for k, v in TECH_OPTIONS["ui"].items()],
-        "backend": [{"value": k, "label": v["label"]} for k, v in TECH_OPTIONS["backend"].items()],
-        "database": [{"value": k, "label": v["label"]} for k, v in TECH_OPTIONS["database"].items()]
+    try:
+        from database.db_connection import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT capabilities FROM knowledge_assets")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error fetching capabilities from database: {e}")
+        rows = []
+
+    # Gather all capabilities
+    all_skills = set()
+    for row in rows:
+        caps = row.get("capabilities", "")
+        if caps:
+            # Split by commas and clean up
+            for val in caps.split(','):
+                cleaned = val.strip()
+                if cleaned and cleaned.lower() not in ["file upload", "document"]:
+                    all_skills.add(cleaned)
+
+    empty_options = {
+        "ui": [],
+        "backend": [],
+        "database": []
     }
+
+    if not all_skills:
+        return empty_options
+
+    # Call LLM to classify these unique skills
+    sys_prompt = (
+        "You are an IT solution architect. Given a list of technical skills or tools, "
+        "categorize each skill into exactly one of three groups: 'ui' (frontend/UI/styling framework), "
+        "'backend' (backend/API/server framework/runtime), or 'database' (databases/caching/datastores).\n"
+        "Ignore other non-UI/non-backend/non-database keywords like AWS, Azure, DevOps, Terraform, Ansible, Migration, etc.\n"
+        "Respond ONLY with a JSON object containing three keys: 'ui', 'backend', and 'database'.\n"
+        "Under each key, provide a list of objects with 'value' (lowercase slug, e.g. 'react') and 'label' (nice display name, e.g. 'React.js').\n"
+        "Example format:\n"
+        "{\n"
+        "  \"ui\": [{\"value\": \"react\", \"label\": \"React.js\"}],\n"
+        "  \"backend\": [{\"value\": \"flask\", \"label\": \"Flask (Python)\"}],\n"
+        "  \"database\": [{\"value\": \"mysql\", \"label\": \"MySQL\"}]\n"
+        "}\n"
+        "Do not include any explanation or markdown formatting."
+    )
+    user_prompt = f"List of skills to classify:\n{', '.join(all_skills)}"
+    
+    try:
+        response = query_llm(sys_prompt, user_prompt, temperature=0.1, json_mode=True)
+        if response:
+            classified = safe_json_loads(response, empty_options)
+            # Validate format
+            for key in ["ui", "backend", "database"]:
+                if key not in classified or not isinstance(classified[key], list):
+                    classified[key] = []
+                # Ensure elements have 'value' and 'label'
+                cleaned_list = []
+                for item in classified[key]:
+                    if isinstance(item, dict) and "value" in item and "label" in item:
+                        cleaned_list.append(item)
+                    elif isinstance(item, str):
+                        cleaned_list.append({"value": item.lower().replace(' ', '_'), "label": item})
+                classified[key] = cleaned_list
+            return classified
+    except Exception as e:
+        print(f"Error classifying skills with LLM: {e}")
+
+    return empty_options
 
 def calculate_budget(ui_tech, backend_tech, db_tech):
     """
     Calculates the total budget dynamically using LLM and Vector Knowledge Base.
     """
-    # 1. Map values to their human readable labels
-    ui_label = TECH_OPTIONS["ui"].get(ui_tech, {}).get("label", ui_tech)
-    backend_label = TECH_OPTIONS["backend"].get(backend_tech, {}).get("label", backend_tech)
-    db_label = TECH_OPTIONS["database"].get(db_tech, {}).get("label", db_tech)
+    # 1. Map values to their human readable labels dynamically
+    options = get_technology_options()
+    
+    def find_label(tech_val, category):
+        for opt in options.get(category, []):
+            if opt.get("value") == tech_val:
+                return opt.get("label")
+        # Fallback if not found
+        return tech_val.replace('_', ' ').title()
+
+    ui_label = find_label(ui_tech, "ui")
+    backend_label = find_label(backend_tech, "backend")
+    db_label = find_label(db_tech, "database")
     
     # 2. Search knowledge base for pricing context
     search_query = f"Cost budget pricing estimation for {ui_label}, {backend_label}, {db_label}"
@@ -52,7 +105,13 @@ def calculate_budget(ui_tech, backend_tech, db_tech):
     kb_context = []
     for r in results:
         meta = r.get("metadata", {})
-        kb_context.append(f"Asset: {meta.get('name', 'Unknown')} - Capabilities/Pricing info: {meta.get('capabilities', '')} / {meta.get('description', '')}")
+        doc_text = r.get("document", "")
+        kb_context.append(
+            f"Asset: {meta.get('name', 'Unknown')} (Category: {meta.get('category', 'Asset')})\n"
+            f"Capabilities: {meta.get('capabilities', '')}\n"
+            f"Description: {meta.get('description', '')}\n"
+            f"Details: {doc_text}\n"
+        )
         
     context_str = "\n".join(kb_context) if kb_context else "No specific pricing knowledge found."
     
