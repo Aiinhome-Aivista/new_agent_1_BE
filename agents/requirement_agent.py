@@ -94,7 +94,7 @@ class RequirementAgent:
                 "   - 'backend': Backend technology or API framework slug (e.g. 'flask', 'django', 'express', 'nestjs', 'spring_boot', 'go_gin', 'fastapi')\n"
                 "   - 'database': Database / Datastore / Cache / Warehouse technology slug (e.g. 'postgresql', 'mysql', 'mongodb', 'arangodb', 'sqlite', 'redis', 'snowflake')\n"
                 "   - 'other_technologies': List of supporting tools/frameworks (e.g. ['Docker', 'Kubernetes', 'GitHub Actions', 'Redis', 'Tailwind CSS'])\n"
-                "   - 'ai_models': A list of strings representing the best AI models to use for this specific stack if it's an AI/ML application (e.g. ['Claude 3.5 Sonnet (Frontier API)', 'Llama 3 8B (Local Inference)']). Otherwise an empty list [].\n"
+                "   - 'ai_models': A dynamic list of exactly 4-5 strings representing the best AI models to use for this specific stack if it's an AI/ML application. You MUST append ' and above' to each model name (e.g. ['Claude 3.5 Sonnet and above', 'Llama 3 8B and above', 'GPT-4o and above', 'Gemini 1.5 Pro and above']). Otherwise an empty list [].\n"
                 "   - 'rationale': One sentence explaining why this stack is a great fit for the client's requirements and the specific application type.\n"
                 "3. 'chat_explanation': A detailed explanation in markdown format representing an AI chat response (RAG Chat style). "
                 "It should introduce the 3 packages, explain the main chosen technologies (including AI model recommendations if applicable), why they are selected based on the requirements and application type, and how they integrate. Use bold text, lists, and a friendly, supportive consulting tone.\n\n"
@@ -123,7 +123,7 @@ class RequirementAgent:
                 "backend": "flask",
                 "database": "mysql",
                 "other_technologies": ["Docker", "Redis", "GitHub Actions", "Tailwind CSS", "Pydantic", "SQLAlchemy"],
-                "ai_models": ["Claude 3.5 Sonnet (Advanced Reasoning)", "Llama 3 8B (Local Privacy & Cost)"],
+                "ai_models": ["Claude 3.5 Sonnet and above", "Llama 3 8B and above", "GPT-4o and above", "Gemini 1.5 Pro and above"],
                 "rationale": "Leverages Python backend for seamless AI model execution, with MySQL as a robust metadata store."
             },
             {
