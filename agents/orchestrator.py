@@ -590,7 +590,9 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         out_dir = os.path.join(os.getcwd(), 'static', 'proposals')
         os.makedirs(out_dir, exist_ok=True)
         import re
-        safe_client_name = re.sub(r'[^a-zA-Z0-9]', '_', client_name).strip('_')
+        if isinstance(client_name, list):
+            client_name = client_name[0] if client_name else "Project"
+        safe_client_name = re.sub(r'[^a-zA-Z0-9]', '_', str(client_name)).strip('_')
         if not safe_client_name:
             safe_client_name = "Project"
             

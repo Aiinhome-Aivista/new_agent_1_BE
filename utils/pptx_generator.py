@@ -5,6 +5,12 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
 
+def safe_text(val):
+    if isinstance(val, list):
+        return ", ".join(str(v) for v in val)
+    return str(val) if val is not None else ""
+
+
 # PwC Brand Colors
 ORANGE = RGBColor(208, 74, 2)       # #D04A02
 CHARCOAL = RGBColor(45, 45, 45)     # #2D2D2D
@@ -97,15 +103,15 @@ def generate_pptx(data, output_path):
     set_font(p_pre.runs[0], size=14, bold=True, color=GOLD)
     
     p_main = tf.add_paragraph()
-    p_main.text = data.get("proposal_title", "Autonomous Solution Design")
+    p_main.text = safe_text(data.get("proposal_title", "Autonomous Solution Design"))
     set_font(p_main.runs[0], size=36, bold=True, color=WHITE)
     
     p_sub = tf.add_paragraph()
-    p_sub.text = f"Prepared for: {data.get('client_name', 'Enterprise Client')}"
+    p_sub.text = f"Prepared for: {safe_text(data.get('client_name', 'Enterprise Client'))}"
     set_font(p_sub.runs[0], size=18, color=LIGHT_GREY)
     
     p_meta = tf.add_paragraph()
-    p_meta.text = f"\nTimeline: {data.get('project_duration', 'N/A')}  |  Target Budget: {data.get('budget', 'N/A')}\nDraft Date: July 2026"
+    p_meta.text = f"\nTimeline: {safe_text(data.get('project_duration', 'N/A'))}  |  Target Budget: {safe_text(data.get('budget', 'N/A'))}\nDraft Date: July 2026"
     set_font(p_meta.runs[0], size=11, color=ORANGE)
 
     # ----------------------------------------------------
@@ -131,7 +137,7 @@ def generate_pptx(data, output_path):
     
     for req in data.get("requirements", ["No requirements specified"]):
         p_item = tf_req.add_paragraph()
-        p_item.text = f"• {req}"
+        p_item.text = f"• {safe_text(req)}"
         set_font(p_item.runs[0], size=11, color=CHARCOAL)
 
     # Gaps and Matches (Right panel)
@@ -150,7 +156,7 @@ def generate_pptx(data, output_path):
 
     for gap in data.get("gaps", ["No gaps identified"]):
         p_item = tf_gap.add_paragraph()
-        p_item.text = f"• {gap}"
+        p_item.text = f"• {safe_text(gap)}"
         set_font(p_item.runs[0], size=11, color=CHARCOAL)
 
     # ----------------------------------------------------
@@ -189,7 +195,7 @@ def generate_pptx(data, output_path):
         
         # Pillar text inside number box
         p_num = n_shape.text_frame.paragraphs[0]
-        p_num.text = f"0{i+1}. {pillar.get('title')}"
+        p_num.text = f"0{i+1}. {safe_text(pillar.get('title'))}"
         p_num.alignment = PP_ALIGN.CENTER
         set_font(p_num.runs[0], size=12, bold=True, color=WHITE)
         
@@ -198,7 +204,7 @@ def generate_pptx(data, output_path):
         tf_desc = desc_box.text_frame
         tf_desc.word_wrap = True
         p_desc = tf_desc.paragraphs[0]
-        p_desc.text = pillar.get("desc", "")
+        p_desc.text = safe_text(pillar.get("desc", ""))
         set_font(p_desc.runs[0], size=11, color=CHARCOAL)
 
     # ----------------------------------------------------
@@ -231,7 +237,7 @@ def generate_pptx(data, output_path):
         hdr_box.line.fill.background()
         
         p_hdr = hdr_box.text_frame.paragraphs[0]
-        p_hdr.text = layer.get("name", "")
+        p_hdr.text = safe_text(layer.get("name", ""))
         p_hdr.alignment = PP_ALIGN.CENTER
         set_font(p_hdr.runs[0], size=11, bold=True, color=WHITE)
         
@@ -248,7 +254,7 @@ def generate_pptx(data, output_path):
                 c_box.line.width = Pt(1)
                 
                 p_comp = c_box.text_frame.paragraphs[0]
-                p_comp.text = comp
+                p_comp.text = safe_text(comp)
                 p_comp.alignment = PP_ALIGN.CENTER
                 set_font(p_comp.runs[0], size=10, bold=True, color=CHARCOAL)
 
@@ -278,12 +284,12 @@ def generate_pptx(data, output_path):
         tf_c = c_shape.text_frame
         tf_c.word_wrap = True
         p_c = tf_c.paragraphs[0]
-        p_c.text = phase.get("phase", "")
+        p_c.text = safe_text(phase.get("phase", ""))
         p_c.alignment = PP_ALIGN.CENTER
         set_font(p_c.runs[0], size=11, bold=True, color=WHITE)
         
         p_dur = tf_c.add_paragraph()
-        p_dur.text = f"({phase.get('duration', '')})"
+        p_dur.text = f"({safe_text(phase.get('duration', ''))})"
         p_dur.alignment = PP_ALIGN.CENTER
         set_font(p_dur.runs[0], size=10, color=GOLD)
 
@@ -301,7 +307,7 @@ def generate_pptx(data, output_path):
         set_font(p_d.runs[0], size=11, bold=True, color=CHARCOAL)
         
         p_d_desc = tf_d.add_paragraph()
-        p_d_desc.text = phase.get("deliverables", "")
+        p_d_desc.text = safe_text(phase.get("deliverables", ""))
         set_font(p_d_desc.runs[0], size=10, color=CHARCOAL)
 
     # ----------------------------------------------------
@@ -343,7 +349,7 @@ def generate_pptx(data, output_path):
         cell.fill.solid()
         cell.fill.fore_color.rgb = CHARCOAL
         p = cell.text_frame.paragraphs[0]
-        p.text = header
+        p.text = safe_text(header)
         p.alignment = PP_ALIGN.CENTER
         set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
@@ -355,7 +361,7 @@ def generate_pptx(data, output_path):
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
             p = cell.text_frame.paragraphs[0]
-            p.text = val
+            p.text = safe_text(val)
             p.alignment = PP_ALIGN.CENTER if j > 0 else PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
@@ -394,7 +400,7 @@ def generate_pptx(data, output_path):
         cell.fill.solid()
         cell.fill.fore_color.rgb = ORANGE
         p = cell.text_frame.paragraphs[0]
-        p.text = header
+        p.text = safe_text(header)
         p.alignment = PP_ALIGN.CENTER
         set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
@@ -406,7 +412,7 @@ def generate_pptx(data, output_path):
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
             p = cell.text_frame.paragraphs[0]
-            p.text = val
+            p.text = safe_text(val)
             p.alignment = PP_ALIGN.CENTER if j == 3 else PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
