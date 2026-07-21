@@ -238,3 +238,55 @@ class RequirementAgent:
                 "matched": matched_assets,
                 "gaps": gaps
             }
+
+    def analyze_advanced_options(self, text: str, requirements: list) -> dict:
+        """
+        Analyzes the document for RAG, Action Engine, and Guardrails requirements.
+        Generates dynamic options if required.
+        """
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", (
+                "You are an Enterprise Solutions Architect & Action Engine Agent.\n"
+                "Analyze the document text and requirements to determine if advanced features are needed.\n"
+                "Broadly interpret the concepts:\n"
+                "1. RAG (Retrieval-Augmented Generation): Needed if you see concepts like 'Vector Knowledge Base', 'Semantic Engine', 'Vector Semantic Matching', 'Document Search', 'Embedding', or 'Retrieval'.\n"
+                "2. Action Engine: Needed if you see mutating external actions like 'sending emails', 'writing to external databases', 'updating third-party records', or 'webhook triggers'.\n"
+                "3. Guardrails (Data Protection): Needed if you see concepts like 'Sensitive Credential Masking', 'PII', 'Security Separation', 'Secret Variables', 'Data Protection', or 'Compliance'.\n\n"
+                "Respond ONLY with a valid JSON object containing exactly three keys: 'rag_options', 'action_engine_options', and 'guardrail_options'.\n"
+                "If a feature is needed based on the document, dynamically suggest 3-4 appropriate technology options for it.\n"
+                "Each option must be a dictionary with an 'id' and 'name'.\n"
+                "If a feature is NOT needed, its value must be an empty list [].\n"
+                "Do NOT use markdown formatting, output raw JSON only."
+            )),
+            ("user", "Requirements:\n{requirements}\n\nDocument snippet:\n{text}")
+        ])
+        
+        chain = prompt | self.llm_json
+        
+        default_res = {
+            "rag_options": [],
+            "action_engine_options": [],
+            "guardrail_options": []
+        }
+        
+        try:
+            res = chain.invoke({
+                "requirements": json.dumps(requirements),
+                "text": text[:8000]
+            })
+            content = res.content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+            parsed = json.loads(content)
+            return {
+                "rag_options": parsed.get("rag_options", []),
+                "action_engine_options": parsed.get("action_engine_options", []),
+                "guardrail_options": parsed.get("guardrail_options", [])
+            }
+        except Exception as e:
+            print(f"Error analyzing advanced options: {e}")
+            return default_res
+

@@ -356,6 +356,9 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         matched = rag_data.get("matched", [])
         gaps = rag_data.get("gaps", [])
         
+        # Analyze Advanced Options (RAG Strategy, Action Engine, Guardrails)
+        advanced_options = req_agent.analyze_advanced_options(full_document_text, requirements)
+        
         logs = f"RAG Grounding complete: Mapped {len(matched)} requirement(s) to assets. Flagged {len(gaps)} gap(s)."
         update_step_status(proposal_id, "Analyzing", "completed", logs)
 
@@ -369,7 +372,10 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "gaps": gaps,
             "extracted_technologies": tech_data.get("extracted_technologies", {"ui": None, "backend": None, "database": None}),
             "tech_options": tech_data.get("tech_options", []),
-            "chat_explanation": tech_data.get("chat_explanation", "")
+            "chat_explanation": tech_data.get("chat_explanation", ""),
+            "rag_options": advanced_options.get("rag_options", []),
+            "action_engine_options": advanced_options.get("action_engine_options", []),
+            "guardrail_options": advanced_options.get("guardrail_options", [])
         }
         update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
         
@@ -384,7 +390,7 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         for step in STEPS:
             update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
-def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, final_budget):
+def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, final_budget, selected_rag="", selected_guardrail="", selected_action_engine=""):
     """Phase 2 of Orchestration: Designing, Planning, Assembling, PPTX rendering."""
     try:
         # Retrieve the partial state
@@ -418,7 +424,10 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             db_tech=db_tech,
             requirements=requirements,
             budget=budget,
-            duration=project_duration
+            duration=project_duration,
+            selected_rag=selected_rag,
+            selected_guardrail=selected_guardrail,
+            selected_action_engine=selected_action_engine
         )
         solution_pillars = design_data.get("solution_pillars", [])
         architecture = design_data.get("architecture", [])

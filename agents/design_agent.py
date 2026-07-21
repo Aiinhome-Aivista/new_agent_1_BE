@@ -12,7 +12,7 @@ class DesignAgent:
         self.llm = get_llm(temperature=0.3)
         self.llm_json = get_llm(temperature=0.2, json_mode=True)
 
-    def generate_design(self, ui_tech: str, backend_tech: str, db_tech: str, requirements: list, budget: str, duration: str) -> dict:
+    def generate_design(self, ui_tech: str, backend_tech: str, db_tech: str, requirements: list, budget: str, duration: str, selected_rag: str = "", selected_guardrail: str = "", selected_action_engine: str = "") -> dict:
         """
         Runs ToT architecture generation.
         1. Explores candidate topologies.
@@ -27,6 +27,9 @@ class DesignAgent:
                 "- Frontend / UI Client: {ui_tech}\n"
                 "- Backend API / logic: {backend_tech}\n"
                 "- Database / Storage: {db_tech}\n"
+                "- Selected RAG Strategy (if any): {selected_rag}\n"
+                "- Selected Guardrails (if any): {selected_guardrail}\n"
+                "- Selected Action Engine (if any): {selected_action_engine}\n"
                 "The client's budget constraint is {budget} and the duration is {duration}.\n\n"
                 "To perform Tree-of-Thoughts:\n"
                 "1. Propose 3 candidate architectural configurations or details (e.g., Option A: Monolithic simplicity, "
@@ -61,6 +64,9 @@ class DesignAgent:
                 "ui_tech": ui_tech,
                 "backend_tech": backend_tech,
                 "db_tech": db_tech,
+                "selected_rag": selected_rag or "None selected",
+                "selected_guardrail": selected_guardrail or "None selected",
+                "selected_action_engine": selected_action_engine or "None selected",
                 "requirements": json.dumps(requirements),
                 "budget": budget,
                 "duration": duration

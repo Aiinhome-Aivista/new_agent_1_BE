@@ -436,6 +436,9 @@ def resume_proposal(proposal_id):
         backend_tech = data.get("backend_tech", "Flask")
         db_tech = data.get("db_tech", "MySQL")
         final_budget = data.get("formatted_budget", "$250,000")
+        selected_rag = data.get("selected_rag", "")
+        selected_guardrail = data.get("selected_guardrail", "")
+        selected_action_engine = data.get("selected_action_engine", "")
         
         # Synchronously update status and budget to prevent race conditions on the frontend
         conn = get_db_connection()
@@ -453,7 +456,7 @@ def resume_proposal(proposal_id):
         
         thread = threading.Thread(
             target=resume_orchestration_phase2,
-            args=(proposal_id, ui_tech, backend_tech, db_tech, final_budget)
+            args=(proposal_id, ui_tech, backend_tech, db_tech, final_budget, selected_rag, selected_guardrail, selected_action_engine)
         )
         thread.daemon = True
         thread.start()
