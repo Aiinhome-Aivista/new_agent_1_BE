@@ -449,7 +449,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "'duration' (weeks range), and 'deliverables' (key activities/deliverables text).\n"
             "- 'resources': a list of exactly 5 resource roles. Each resource object contains: "
             "'role' (string), 'loc' ('Onsite', 'Offshore', 'Hybrid'), 'fte' (decimal string, e.g., '1.00', '0.25'), "
-            "'rate' (monthly rate string, e.g., '$8,000'), and 'total' (total cost calculation for this resource as a string, e.g. '$10,000').\n"
+            "'rate' (monthly rate string, e.g., '$8,000'), 'total' (total cost calculation for this resource as a string, e.g. '$10,000'), "
+            "and 'person_days' (integer representing total estimated effort in days, e.g. 40).\n"
             "- 'skills_mapping': a list of exactly 5 skills mapping objects. Each object contains: "
             "'skill' (technical skill name), 'role' (matching project role), 'asset' (matching PwC Asset/Competency name), "
             "and 'conf' (confidence percentage string, e.g. '95%').\n"
@@ -469,11 +470,11 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             {"phase": "Phase 3: UAT & Handoff", "duration": "Weeks 11-14", "deliverables": "UAT feedback validation, performance tuning, and staging platform release."}
         ]
         default_resources = [
-            {"role": "Engagement Director", "loc": "Hybrid", "fte": "0.15", "rate": "$32,000", "total": "$21,600"},
-            {"role": "Lead Architect", "loc": "Onsite", "fte": "1.00", "rate": "$25,000", "total": "$100,000"},
-            {"role": "Senior Developer (Front-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000"},
-            {"role": "Senior Developer (Back-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000"},
-            {"role": "QA & Test Engineer", "loc": "Offshore", "fte": "1.00", "rate": "$6,000", "total": "$24,000"}
+            {"role": "Engagement Director", "loc": "Hybrid", "fte": "0.15", "rate": "$32,000", "total": "$21,600", "person_days": 10},
+            {"role": "Lead Architect", "loc": "Onsite", "fte": "1.00", "rate": "$25,000", "total": "$100,000", "person_days": 60},
+            {"role": "Senior Developer (Front-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000", "person_days": 90},
+            {"role": "Senior Developer (Back-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000", "person_days": 90},
+            {"role": "QA & Test Engineer", "loc": "Offshore", "fte": "1.00", "rate": "$6,000", "total": "$24,000", "person_days": 60}
         ]
         default_skills = [
             {"skill": "React 18 & TypeScript", "role": "Senior Developer (Front-end)", "asset": "React/TypeScript Front-End Competency", "conf": "High (95%)"},
@@ -519,6 +520,10 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "gaps": gaps,
             "solution_pillars": solution_pillars,
             "architecture": architecture,
+            "business_summary": design_data.get("business_summary", ""),
+            "data_flow": design_data.get("data_flow", []),
+            "infrastructure_approximation": design_data.get("infrastructure_approximation", []),
+            "similar_projects": design_data.get("similar_projects", []),
             "timeline_phases": timeline_phases,
             "resources": resources,
             "skills_mapping": skills_mapping

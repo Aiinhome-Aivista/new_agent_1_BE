@@ -36,11 +36,15 @@ class DesignAgent:
                 "Option B: Serverless/Microservices fan-out, Option C: Decoupled SPA with high caching).\n"
                 "2. Evaluate each candidate's development cost, delivery risk, scalability, and alignment with the timeline.\n"
                 "3. Choose the best, most compliant option, and render it into the final output format.\n\n"
-                "Your response must ONLY be a JSON object with these two keys:\n"
+                "Your response must ONLY be a JSON object with these keys:\n"
+                "- 'business_summary': a 2-paragraph string summarizing the proposed solution.\n"
                 "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (sentence detail).\n"
+                "- 'data_flow': a list of exactly 4 strings representing the high-level data flow steps.\n"
                 "- 'architecture': a list of exactly 3 layers (e.g. 'Presentation layer (UI Client)', "
                 "'Application Logic (API Backend)', 'Data Integration & Cache Layer') where each layer object contains "
-                "'name' (string) and 'components' (list of strings representing systems/frameworks).\n\n"
+                "'name' (string) and 'components' (list of strings representing systems/frameworks).\n"
+                "- 'infrastructure_approximation': a list of exactly 3 objects, each with 'component', 'spec', and 'estimated_monthly_cost'.\n"
+                "- 'similar_projects': a list of exactly 2 objects, each with 'client_industry', 'project_name', and 'outcome'.\n\n"
                 "Do not include any explanation or markdown formatting outside the JSON."
             )),
             ("user", "Requirements:\n{requirements}\n\nBudget: {budget}\nDuration: {duration}")
@@ -57,6 +61,22 @@ class DesignAgent:
             {"name": "Presentation layer (UI Client)", "components": [f"{ui_tech} SPA", "State Management", "Axios Client"]},
             {"name": "Application Logic (API Backend)", "components": [f"{backend_tech} Web Service", "Agent Control Loop", "Auth Middleware"]},
             {"name": "Data Integration & Cache Layer", "components": [f"{db_tech} Database", "python-pptx Builder", "Semantic RAG Store"]}
+        ]
+        default_business_summary = "This proposal outlines a state-of-the-art solution designed to address your key requirements by leveraging modern cloud and AI capabilities.\n\nOur approach ensures scalability, security, and rapid time-to-market, minimizing risks while maximizing operational efficiency."
+        default_data_flow = [
+            "1. User securely inputs requirements via React Dashboard.",
+            "2. Orchestrator triggers Python agents to analyze and query Vector DB.",
+            "3. RAG results are synthesized and stored in the core relational database.",
+            "4. PPTX Generator renders the final proposal for download."
+        ]
+        default_infrastructure = [
+            {"component": "Application Server", "spec": "8 vCPU, 32GB RAM", "estimated_monthly_cost": "$250"},
+            {"component": "Relational Database", "spec": "Managed PostgreSQL, 100GB", "estimated_monthly_cost": "$150"},
+            {"component": "Vector Database", "spec": "Managed Qdrant Cluster", "estimated_monthly_cost": "$200"}
+        ]
+        default_similar_projects = [
+            {"client_industry": "Financial Services", "project_name": "Autonomous Deal Assistant", "outcome": "Reduced proposal generation time by 40%."},
+            {"client_industry": "Healthcare", "project_name": "Compliance RAG Engine", "outcome": "Automated security mapping for 10,00+ documents."}
         ]
         
         try:
@@ -84,12 +104,20 @@ class DesignAgent:
             arch = design_data.get("architecture", default_architecture)
             
             return {
+                "business_summary": design_data.get("business_summary", default_business_summary),
                 "solution_pillars": pillars,
-                "architecture": arch
+                "data_flow": design_data.get("data_flow", default_data_flow),
+                "architecture": arch,
+                "infrastructure_approximation": design_data.get("infrastructure_approximation", default_infrastructure),
+                "similar_projects": design_data.get("similar_projects", default_similar_projects)
             }
         except Exception as e:
             print(f"Error in Solution Design Agent: {e}")
             return {
+                "business_summary": default_business_summary,
                 "solution_pillars": default_pillars,
-                "architecture": default_architecture
+                "data_flow": default_data_flow,
+                "architecture": default_architecture,
+                "infrastructure_approximation": default_infrastructure,
+                "similar_projects": default_similar_projects
             }
