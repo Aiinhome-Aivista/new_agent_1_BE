@@ -242,18 +242,10 @@ def transition_proposal_status(proposal_id):
         # Keys: (from_status, to_status) → allowed_roles tuple
         # -------------------------------------------------------
         ALLOWED_TRANSITIONS = {
-            # AI pipeline complete → proposal enters business workflow as Draft
-            ("Complete",        "Draft"):          ("presales", "bidmanager", "admin"),
-            # Pre-Sales / Bid Manager submits to Delivery Lead
-            ("Draft",           "DeliveryReview"): ("presales", "bidmanager", "admin"),
-            # Delivery Lead is satisfied, submits to Reviewing Partner
-            ("DeliveryReview",  "PartnerReview"):  ("delivery", "admin"),
-            # Partner approves
-            ("PartnerReview",   "Approved"):       ("partner", "admin"),
-            # Partner rejects — sends back for revision to Pre-Sales/Bid Manager
-            ("PartnerReview",   "Draft"):          ("partner", "admin"),
-            # Partner publishes after approval
-            ("Approved",        "Published"):      ("partner", "admin"),
+            ("Complete",        "Approved"):       ("presales", "bidmanager", "admin", "partner", "delivery"),
+            ("Complete",        "Rejected"):       ("presales", "bidmanager", "admin", "partner", "delivery"),
+            ("Rejected",        "Approved"):       ("presales", "bidmanager", "admin", "partner", "delivery"),
+            ("Approved",        "Published"):      ("presales", "bidmanager", "admin", "partner", "delivery"),
         }
         
         transition_key = (current_status, new_status)
@@ -282,11 +274,9 @@ def transition_proposal_status(proposal_id):
         
         # Add human-readable log entry to proposal_steps for audit trail
         action_labels = {
-            ("Complete",       "Draft"):         "Proposal moved to Draft for review",
-            ("Draft",          "DeliveryReview"):"Submitted to Delivery Lead for feasibility review",
-            ("DeliveryReview", "PartnerReview"): "Delivery review complete. Submitted to Reviewing Partner",
-            ("PartnerReview",  "Approved"):      "Partner APPROVED the proposal",
-            ("PartnerReview",  "Draft"):         "Partner REJECTED — returned for revision",
+            ("Complete",       "Approved"):      "Proposal APPROVED",
+            ("Complete",       "Rejected"):      "Proposal REJECTED — returned for revision",
+            ("Rejected",       "Approved"):      "Proposal APPROVED",
             ("Approved",       "Published"):     "Proposal PUBLISHED and finalized",
         }
         log_msg = action_labels.get(transition_key, f"Status moved from {current_status} to {new_status}")
@@ -446,6 +436,9 @@ def resume_proposal(proposal_id):
         backend_tech = data.get("backend_tech", "Flask")
         db_tech = data.get("db_tech", "MySQL")
         final_budget = data.get("formatted_budget", "$250,000")
+        selected_rag = data.get("selected_rag", "")
+        selected_guardrail = data.get("selected_guardrail", "")
+        selected_action_engine = data.get("selected_action_engine", "")
         
         # Synchronously update status and budget to prevent race conditions on the frontend
         conn = get_db_connection()
@@ -463,7 +456,7 @@ def resume_proposal(proposal_id):
         
         thread = threading.Thread(
             target=resume_orchestration_phase2,
-            args=(proposal_id, ui_tech, backend_tech, db_tech, final_budget)
+            args=(proposal_id, ui_tech, backend_tech, db_tech, final_budget, selected_rag, selected_guardrail, selected_action_engine)
         )
         thread.daemon = True
         thread.start()

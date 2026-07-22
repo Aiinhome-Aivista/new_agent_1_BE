@@ -5,6 +5,12 @@ from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 from pptx.enum.shapes import MSO_SHAPE
 
+def safe_text(val):
+    if isinstance(val, list):
+        return ", ".join(str(v) for v in val)
+    return str(val) if val is not None else ""
+
+
 # PwC Brand Colors
 ORANGE = RGBColor(208, 74, 2)       # #D04A02
 CHARCOAL = RGBColor(45, 45, 45)     # #2D2D2D
@@ -97,16 +103,35 @@ def generate_pptx(data, output_path):
     set_font(p_pre.runs[0], size=14, bold=True, color=GOLD)
     
     p_main = tf.add_paragraph()
-    p_main.text = data.get("proposal_title", "Autonomous Solution Design")
+    p_main.text = safe_text(data.get("proposal_title", "Autonomous Solution Design"))
     set_font(p_main.runs[0], size=36, bold=True, color=WHITE)
     
     p_sub = tf.add_paragraph()
-    p_sub.text = f"Prepared for: {data.get('client_name', 'Enterprise Client')}"
+    p_sub.text = f"Prepared for: {safe_text(data.get('client_name', 'Enterprise Client'))}"
     set_font(p_sub.runs[0], size=18, color=LIGHT_GREY)
     
     p_meta = tf.add_paragraph()
-    p_meta.text = f"\nTimeline: {data.get('project_duration', 'N/A')}  |  Target Budget: {data.get('budget', 'N/A')}\nDraft Date: July 2026"
+    p_meta.text = f"\nTimeline: {safe_text(data.get('project_duration', 'N/A'))}  |  Target Budget: {safe_text(data.get('budget', 'N/A'))}\nDraft Date: July 2026"
     set_font(p_meta.runs[0], size=11, color=ORANGE)
+
+    # ----------------------------------------------------
+    # SLIDE 1A: Business Summary
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "Business Summary", "Executive overview of the proposed solution")
+    add_footer(slide)
+
+    summary_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.5), Inches(9.0), Inches(5.0))
+    tf_sum = summary_box.text_frame
+    tf_sum.word_wrap = True
+    
+    business_summary = data.get("business_summary", "No business summary provided.")
+    for paragraph in business_summary.split('\n'):
+        if paragraph.strip():
+            p_sum = tf_sum.add_paragraph()
+            p_sum.text = safe_text(paragraph.strip())
+            set_font(p_sum.runs[0], size=14, color=CHARCOAL)
+            p_sum.space_after = Pt(14)
 
     # ----------------------------------------------------
     # SLIDE 2: Client Requirements & Gap Analysis
@@ -131,7 +156,7 @@ def generate_pptx(data, output_path):
     
     for req in data.get("requirements", ["No requirements specified"]):
         p_item = tf_req.add_paragraph()
-        p_item.text = f"• {req}"
+        p_item.text = f"• {safe_text(req)}"
         set_font(p_item.runs[0], size=11, color=CHARCOAL)
 
     # Gaps and Matches (Right panel)
@@ -150,14 +175,14 @@ def generate_pptx(data, output_path):
 
     for gap in data.get("gaps", ["No gaps identified"]):
         p_item = tf_gap.add_paragraph()
-        p_item.text = f"• {gap}"
+        p_item.text = f"• {safe_text(gap)}"
         set_font(p_item.runs[0], size=11, color=CHARCOAL)
 
     # ----------------------------------------------------
-    # SLIDE 3: Solution Approach
+    # SLIDE 3: Solution Approach & Architecture
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Solution Approach & Methodologies", "High-level implementation strategy and operational frameworks")
+    create_slide_header(slide, "Solution Approach & Architecture", "High-level implementation strategy and operational frameworks")
     add_footer(slide)
 
     # 3-Pillar Solution display
@@ -189,7 +214,7 @@ def generate_pptx(data, output_path):
         
         # Pillar text inside number box
         p_num = n_shape.text_frame.paragraphs[0]
-        p_num.text = f"0{i+1}. {pillar.get('title')}"
+        p_num.text = f"0{i+1}. {safe_text(pillar.get('title'))}"
         p_num.alignment = PP_ALIGN.CENTER
         set_font(p_num.runs[0], size=12, bold=True, color=WHITE)
         
@@ -198,14 +223,49 @@ def generate_pptx(data, output_path):
         tf_desc = desc_box.text_frame
         tf_desc.word_wrap = True
         p_desc = tf_desc.paragraphs[0]
-        p_desc.text = pillar.get("desc", "")
+        p_desc.text = safe_text(pillar.get("desc", ""))
         set_font(p_desc.runs[0], size=11, color=CHARCOAL)
+
+    # ----------------------------------------------------
+    # SLIDE 3B: High Level Design: Data Flow
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "High Level Design: Data Flow", "Data processing pipeline and integration points")
+    add_footer(slide)
+
+    data_flow = data.get("data_flow", [])
+    
+    if data_flow:
+        df_width = Inches(8.0 / len(data_flow))
+        for i, step in enumerate(data_flow):
+            left = Inches(1.0) + (i * df_width)
+            
+            # Step Box
+            s_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, Inches(2.5), df_width - Inches(0.2), Inches(2.0))
+            s_box.fill.solid()
+            s_box.fill.fore_color.rgb = OFF_WHITE
+            s_box.line.color.rgb = ORANGE
+            s_box.line.width = Pt(1.5)
+            
+            tf_s = s_box.text_frame
+            tf_s.word_wrap = True
+            p_s = tf_s.paragraphs[0]
+            p_s.text = safe_text(step)
+            p_s.alignment = PP_ALIGN.CENTER
+            set_font(p_s.runs[0], size=11, bold=True, color=CHARCOAL)
+            
+            # Arrow
+            if i < len(data_flow) - 1:
+                arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, left + df_width - Inches(0.15), Inches(3.3), Inches(0.2), Inches(0.4))
+                arrow.fill.solid()
+                arrow.fill.fore_color.rgb = GOLD
+                arrow.line.fill.background()
 
     # ----------------------------------------------------
     # SLIDE 4: Landscape Architecture
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Landscape Architecture & System Design", "Reference systems architecture and integration patterns")
+    create_slide_header(slide, "Landscape & Architecture", "Reference systems architecture and integration patterns")
     add_footer(slide)
 
     arch_layers = data.get("architecture", [
@@ -231,7 +291,7 @@ def generate_pptx(data, output_path):
         hdr_box.line.fill.background()
         
         p_hdr = hdr_box.text_frame.paragraphs[0]
-        p_hdr.text = layer.get("name", "")
+        p_hdr.text = safe_text(layer.get("name", ""))
         p_hdr.alignment = PP_ALIGN.CENTER
         set_font(p_hdr.runs[0], size=11, bold=True, color=WHITE)
         
@@ -248,15 +308,56 @@ def generate_pptx(data, output_path):
                 c_box.line.width = Pt(1)
                 
                 p_comp = c_box.text_frame.paragraphs[0]
-                p_comp.text = comp
+                p_comp.text = safe_text(comp)
                 p_comp.alignment = PP_ALIGN.CENTER
                 set_font(p_comp.runs[0], size=10, bold=True, color=CHARCOAL)
 
     # ----------------------------------------------------
-    # SLIDE 5: Program Timeline
+    # SLIDE 4B: Infrastructure Approximation
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Program Timeline & Key Milestones", "Sequential delivery phases and target deliverables")
+    create_slide_header(slide, "Infrastructure Approximation", "Estimated cloud infrastructure components and costs")
+    add_footer(slide)
+
+    infra_items = data.get("infrastructure_approximation", [])
+    
+    if infra_items:
+        infra_rows = len(infra_items) + 1
+        infra_cols = 3
+        infra_table_shape = slide.shapes.add_table(infra_rows, infra_cols, Inches(1.0), Inches(2.0), Inches(8.0), Inches(0.5 * infra_rows))
+        i_table = infra_table_shape.table
+        
+        i_table.columns[0].width = Inches(2.5)
+        i_table.columns[1].width = Inches(3.5)
+        i_table.columns[2].width = Inches(2.0)
+        
+        i_headers = ["Component", "Specification", "Est. Monthly Cost"]
+        for j, hdr in enumerate(i_headers):
+            cell = i_table.cell(0, j)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = CHARCOAL
+            p = cell.text_frame.paragraphs[0]
+            p.text = hdr
+            p.alignment = PP_ALIGN.CENTER
+            set_font(p.runs[0], size=12, bold=True, color=WHITE)
+            
+        for i, item in enumerate(infra_items):
+            row_idx = i + 1
+            vals = [item.get("component"), item.get("spec"), str(item.get("estimated_monthly_cost"))]
+            for j, val in enumerate(vals):
+                cell = i_table.cell(row_idx, j)
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
+                p = cell.text_frame.paragraphs[0]
+                p.text = safe_text(val)
+                p.alignment = PP_ALIGN.CENTER if j == 2 else PP_ALIGN.LEFT
+                set_font(p.runs[0], size=11, color=CHARCOAL)
+
+    # ----------------------------------------------------
+    # SLIDE 5: Project Timeline
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "Project Timeline", "Sequential delivery phases and target deliverables")
     add_footer(slide)
 
     phases = data.get("timeline_phases", [
@@ -278,12 +379,12 @@ def generate_pptx(data, output_path):
         tf_c = c_shape.text_frame
         tf_c.word_wrap = True
         p_c = tf_c.paragraphs[0]
-        p_c.text = phase.get("phase", "")
+        p_c.text = safe_text(phase.get("phase", ""))
         p_c.alignment = PP_ALIGN.CENTER
         set_font(p_c.runs[0], size=11, bold=True, color=WHITE)
         
         p_dur = tf_c.add_paragraph()
-        p_dur.text = f"({phase.get('duration', '')})"
+        p_dur.text = f"({safe_text(phase.get('duration', ''))})"
         p_dur.alignment = PP_ALIGN.CENTER
         set_font(p_dur.runs[0], size=10, color=GOLD)
 
@@ -301,29 +402,59 @@ def generate_pptx(data, output_path):
         set_font(p_d.runs[0], size=11, bold=True, color=CHARCOAL)
         
         p_d_desc = tf_d.add_paragraph()
-        p_d_desc.text = phase.get("deliverables", "")
+        p_d_desc.text = safe_text(phase.get("deliverables", ""))
         set_font(p_d_desc.runs[0], size=10, color=CHARCOAL)
 
     # ----------------------------------------------------
-    # SLIDE 6: Resource Distribution & Rates
+    # SLIDE 5B: Similar Projects
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Resource Distribution & Financial Mapping", "Allocated program FTE structure, rate cards, and financial sizing")
+    create_slide_header(slide, "Similar Projects", "Past credentials and successful delivery outcomes")
+    add_footer(slide)
+
+    sim_projects = data.get("similar_projects", [])
+    
+    if sim_projects:
+        for i, proj in enumerate(sim_projects[:2]):
+            top = Inches(2.0 + (i * 2.2))
+            
+            p_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.0), top, Inches(8.0), Inches(1.8))
+            p_box.fill.solid()
+            p_box.fill.fore_color.rgb = OFF_WHITE
+            p_box.line.color.rgb = GOLD
+            p_box.line.width = Pt(1.5)
+            
+            tf_p = p_box.text_frame
+            tf_p.word_wrap = True
+            
+            p_title = tf_p.paragraphs[0]
+            p_title.text = f"{safe_text(proj.get('client_industry', 'Industry'))} | {safe_text(proj.get('project_name', 'Project'))}"
+            set_font(p_title.runs[0], size=14, bold=True, color=ORANGE)
+            
+            p_outcome = tf_p.add_paragraph()
+            p_outcome.text = f"Outcome: {safe_text(proj.get('outcome', ''))}"
+            set_font(p_outcome.runs[0], size=12, color=CHARCOAL)
+
+    # ----------------------------------------------------
+    # SLIDE 6: Effort & Person-Hour Conversion
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "Effort & Person-Hour Conversion", "Allocated program FTE structure, rate cards, and financial sizing")
     add_footer(slide)
 
     # Table layout
     resources = data.get("resources", [
-        {"role": "Engagement Partner", "loc": "Onsite", "fte": "0.25", "rate": "$30,000", "total": "$45,000"},
-        {"role": "Lead Architect", "loc": "Onsite / Hybrid", "fte": "1.00", "rate": "$24,000", "total": "$144,000"},
-        {"role": "Senior Frontend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000"},
-        {"role": "Senior Backend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000"},
-        {"role": "DevOps & Security Specialist", "loc": "Offshore", "fte": "1.00", "rate": "$9,000", "total": "$54,000"}
+        {"role": "Engagement Partner", "loc": "Onsite", "fte": "0.25", "rate": "$30,000", "total": "$45,000", "person_days": 10},
+        {"role": "Lead Architect", "loc": "Onsite / Hybrid", "fte": "1.00", "rate": "$24,000", "total": "$144,000", "person_days": 60},
+        {"role": "Senior Frontend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
+        {"role": "Senior Backend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
+        {"role": "DevOps & Security Specialist", "loc": "Offshore", "fte": "1.00", "rate": "$9,000", "total": "$54,000", "person_days": 60}
     ])
     
     rows = len(resources) + 1
     # Cap rows to fit on one slide
     rows = min(rows, 9)
-    cols = 5
+    cols = 6
     
     # Calculate a sensible height for the table depending on rows
     table_height = Inches(0.4 * rows)
@@ -331,31 +462,32 @@ def generate_pptx(data, output_path):
     table = table_shape.table
 
     # Column Widths
-    table.columns[0].width = Inches(2.5) # Role
-    table.columns[1].width = Inches(1.5) # Location
-    table.columns[2].width = Inches(1.5) # Count (FTE)
+    table.columns[0].width = Inches(2.0) # Role
+    table.columns[1].width = Inches(1.2) # Location
+    table.columns[2].width = Inches(1.2) # Count (FTE)
     table.columns[3].width = Inches(1.5) # Monthly Rate
-    table.columns[4].width = Inches(2.0) # Total Sizing
+    table.columns[4].width = Inches(1.3) # Person Days
+    table.columns[5].width = Inches(1.8) # Total Sizing
 
-    headers = ["Role / Competency", "Delivery Location", "FTE Count", "Monthly Rate", "Total Financial Sizing"]
+    headers = ["Role / Competency", "Delivery Location", "FTE Count", "Monthly Rate", "Person Days", "Total Financial Sizing"]
     for j, header in enumerate(headers):
         cell = table.cell(0, j)
         cell.fill.solid()
         cell.fill.fore_color.rgb = CHARCOAL
         p = cell.text_frame.paragraphs[0]
-        p.text = header
+        p.text = safe_text(header)
         p.alignment = PP_ALIGN.CENTER
         set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
     for i, res in enumerate(resources[:rows-1]):
         row_idx = i + 1
-        cols_val = [res.get("role"), res.get("loc"), res.get("fte"), res.get("rate"), res.get("total")]
+        cols_val = [res.get("role"), res.get("loc"), res.get("fte"), res.get("rate"), str(res.get("person_days", "N/A")), res.get("total")]
         for j, val in enumerate(cols_val):
             cell = table.cell(row_idx, j)
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
             p = cell.text_frame.paragraphs[0]
-            p.text = val
+            p.text = safe_text(val)
             p.alignment = PP_ALIGN.CENTER if j > 0 else PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
@@ -394,7 +526,7 @@ def generate_pptx(data, output_path):
         cell.fill.solid()
         cell.fill.fore_color.rgb = ORANGE
         p = cell.text_frame.paragraphs[0]
-        p.text = header
+        p.text = safe_text(header)
         p.alignment = PP_ALIGN.CENTER
         set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
@@ -406,7 +538,7 @@ def generate_pptx(data, output_path):
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
             p = cell.text_frame.paragraphs[0]
-            p.text = val
+            p.text = safe_text(val)
             p.alignment = PP_ALIGN.CENTER if j == 3 else PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 

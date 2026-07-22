@@ -212,18 +212,24 @@ def add_knowledge():
                 
                 # Extract text
                 extracted_text = extract_text(filepath)
-                description_snippet = extracted_text[:200] + "..." if len(extracted_text) > 200 else extracted_text
+                
+                # Dynamic metadata extraction using LLM
+                from utils.llm_client import extract_pdf_metadata
+                meta = extract_pdf_metadata(extracted_text)
+                category = meta.get("category", "Asset")
+                capabilities = meta.get("capabilities", "File Upload")
+                description = meta.get("description", extracted_text[:200] + "...")
                 
                 # Insert into SQLite (Metadata)
                 cursor.execute(
                     "INSERT INTO knowledge_assets (name, description, category, capabilities) VALUES (%s, %s, %s, %s)",
-                    (filename, description_snippet, "Document", "File Upload")
+                    (filename, description, category, capabilities)
                 )
                 asset_id = cursor.lastrowid
                 
                 # Store in VectorDB (ChromaDB)
-                # Note: pricing_kb.py uses default collection for search, but wait, pricing_kb uses `search_embeddings` which doesn't take collection in the new version? Wait, let me check vector_client.py: `search_embeddings(collection_name, query, n_results=3)`
-                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": "Document", "description": description_snippet})
+                # Note: pricing_kb.py uses default collection for search
+                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": category, "description": description})
                 
                 # Store in GraphDB (ArangoDB)
                 if arango:
@@ -233,9 +239,9 @@ def add_knowledge():
                             doc_key=str(asset_id),
                             document={
                                 "name": filename,
-                                "description": description_snippet,
-                                "category": "Document",
-                                "capabilities": "File Upload",
+                                "description": description,
+                                "category": category,
+                                "capabilities": capabilities,
                                 "full_text": extracted_text
                             }
                         )

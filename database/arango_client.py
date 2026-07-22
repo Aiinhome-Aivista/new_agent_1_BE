@@ -181,7 +181,7 @@ class ArangoDBClient:
     def upsert_document(self, collection, doc_key, document):
         try:
             from database.vector_client import get_embedding, store_embedding
-            text_to_embed = f"{document.get('name', '')} {document.get('description', '')} {document.get('capabilities', '')}"
+            text_to_embed = f"{document.get('name', '')} {document.get('description', '')} {document.get('capabilities', '')} {document.get('full_text', '')}".strip()
             document["embedding"] = get_embedding(text_to_embed)
             document["_key"] = doc_key
             

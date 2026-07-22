@@ -1,0 +1,26 @@
+Enterprise Software Advisory Technical Competencies & Rates Guide
+
+Overview:
+This catalog defines the technical capabilities, platforms, libraries, databases, and resource rates used across our pre-sales solutions advisory.
+
+1. Frontend / UI Technologies & Frameworks:
+- React.js: Modern single page applications, Zustand state management. Setup base cost: $10,000. Developer rate: $8,000 / month.
+- Angular: TypeScript enterprise web applications, RxJS state management. Setup base cost: $12,000. Developer rate: $9,000 / month.
+- Vue.js: Lightweight reactive web pages, Pinia state management. Setup base cost: $9,000. Developer rate: $7,500 / month.
+- Vanilla HTML/JS: Standard static websites, low overhead. Setup base cost: $5,000. Developer rate: $6,000 / month.
+- Tailwind CSS & Bootstrap: Responsive layouts, utility classes. Setup base cost: $3,000.
+
+2. Backend / API Technologies & Frameworks:
+- Flask: Python microservice backend APIs, low memory. Setup base cost: $9,000. Developer rate: $8,000 / month.
+- Django: Python monolithic backend API, built-in admin panel. Setup base cost: $12,000. Developer rate: $9,500 / month.
+- Express.js & NestJS: Node.js server frameworks, rapid development, asynchronous. Setup base cost: $10,000. Developer rate: $8,500 / month.
+- Spring Boot: Java enterprise microservices, robust multithreading. Setup base cost: $15,000. Developer rate: $11,000 / month.
+- Go / Gin: High performance, compiled systems APIs, concurrent. Setup base cost: $14,000. Developer rate: $12,000 / month.
+
+3. Database, Cache, and Storage Technologies:
+- MySQL: Relational open-source SQL database. Setup base cost: $6,000. Admin rate: $7,000 / month.
+- PostgreSQL: Advanced relational database, ACID compliant, JSON query support. Setup base cost: $8,000. Admin rate: $8,500 / month.
+- MongoDB: NoSQL document store, high scalability. Setup base cost: $7,500. Admin rate: $8,000 / month.
+- ArangoDB: NoSQL graph and document database engine. Setup base cost: $10,000. Admin rate: $9,500 / month.
+- SQLite: Embedded relational database file. Setup base cost: $2,000.
+- Redis: Fast in-memory caching and session store. Setup base cost: $4,000.

@@ -10,6 +10,11 @@ from utils.doc_extractor import extract_text
 from database.arango_client import arango_client
 from database.vector_client import get_embedding, retrieve_nearest, cosine_similarity
 
+# Import LangChain Agents
+from agents.intake_agent import IntakeAgent
+from agents.requirement_agent import RequirementAgent
+
+
 def chunk_text(text, chunk_size=1000, overlap=100):
     """Splits document text into overlapping blocks of characters."""
     if not text:
@@ -205,9 +210,14 @@ def safe_json_loads(json_str, fallback):
 def run_orchestration(proposal_id, client_name, project_duration, budget, files_info):
     """The full Multi-Agent pipeline, executing step-by-step using LLM and fallback defaults."""
     try:
+        # Initialize LangChain Agents
+        intake_agent = IntakeAgent()
+        req_agent = RequirementAgent()
+
         # Initialize steps in database as 'pending'
         for step in STEPS:
             update_step_status(proposal_id, step, "pending", "Waiting to start...")
+
 
         # ----------------------------------------------------
         # 1. INTAKE AGENT (Document parsing, extraction & validation)
@@ -236,7 +246,8 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                         chunks = chunk_text(txt, chunk_size=1000, overlap=100)
                         from database.vector_client import store_embedding
                         for idx, chunk in enumerate(chunks):
-                            classification = classify_chunk(chunk)
+                            classification = intake_agent.classify_chunk(chunk)
+
                             embedding = get_embedding(chunk)
                             
                             chunk_id = f"{proposal_id}_{orig_name}_{idx}"
@@ -290,21 +301,8 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         needs_budget = (budget == "Extracting...")
         
         if needs_client or needs_duration or needs_budget:
-            # Query LLM to extract metadata
-            meta_sys_prompt = (
-                "You are an assistant that extracts metadata from client RFPs.\n"
-                "Extract the following values if they are present in the text:\n"
-                "1. Client Name (the company asking for the proposal, e.g. 'Acme Corporation')\n"
-                "2. Project Duration/Timeline (e.g. '14 Weeks')\n"
-                "3. Target Budget (e.g. '$250,000')\n"
-                "Respond ONLY with a JSON object containing keys: 'client_name', 'project_duration', 'budget'.\n"
-                "Do not include markdown code block syntax or comments."
-            )
-            meta_user_prompt = f"RFP Text Snippet:\n\n{full_document_text[:5000]}"
-            meta_raw = query_llm(meta_sys_prompt, meta_user_prompt, json_mode=True)
-            if meta_raw is None:
-                raise RuntimeError("Failed to connect to local Mistral LLM server for metadata extraction (read timeout/offline).")
-            extracted_meta = safe_json_loads(meta_raw, {})
+            # Query LLM to extract metadata using LangChain IntakeAgent
+            extracted_meta = intake_agent.extract_metadata(full_document_text)
             if needs_client:
                 ext_client = str(extracted_meta.get("client_name") or "").strip()
                 if not ext_client or "Extracting" in ext_client:
@@ -327,6 +325,7 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             # Update the database with the extracted metadata
             update_proposal_metadata(proposal_id, client_name, project_duration, budget)
 
+
         # Save proposal metadata to ArangoDB
         if arango_client.is_connected:
             prop_record = {
@@ -346,80 +345,19 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         # ----------------------------------------------------
         update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying PwC assets repository (RAG)...")
         
-        # Call LLM to extract requirements
-        req_sys_prompt = (
-            "You are a pre-sales engineering assistant. Given the client document text, "
-            "extract the top 5 technical and business requirements for this solution. "
-            "Respond ONLY as a JSON list of strings, with no other text, comments or markdown blocks. "
-            "Example format:\n[\n  \"Requirement 1\",\n  \"Requirement 2\"\n]"
-        )
-        req_user_prompt = f"Client Document Text:\n\n{full_document_text[:8000]}"
+        # Extract requirements using LangChain RequirementAgent
+        requirements = req_agent.extract_requirements(full_document_text)
         
-        extracted_reqs_raw = query_llm(req_sys_prompt, req_user_prompt, json_mode=True)
-        if extracted_reqs_raw is None:
-            raise RuntimeError("Failed to connect to local Mistral LLM server for requirement extraction (read timeout/offline).")
-        default_requirements = [
-            f"Deliver high-performance React front-end application with state management.",
-            f"Establish secure, authenticated JSON APIs with low latency.",
-            f"Set up secure containerized database configuration with audit trails.",
-            f"Implement automated DevOps workflows, CI/CD, and security vulnerability scanning.",
-            f"Adhere to delivery target timeline within {project_duration}."
-        ]
-        requirements = safe_json_loads(extracted_reqs_raw, default_requirements)
-        if not isinstance(requirements, list) or len(requirements) == 0:
-            requirements = default_requirements
-
-        from database.vector_client import search_embeddings
-        matched_assets = []
-        gaps = []
+        # Extract tech stack and get suggestions using LangChain RequirementAgent
+        tech_data = req_agent.analyze_tech_stack(full_document_text, requirements)
         
-        # Vector RAG capability mapping using ChromaDB
-        for req in requirements:
-            results = search_embeddings("knowledge_assets", req, n_results=1)
-            
-            if results and len(results) > 0 and results[0]["similarity"] >= 0.40:
-                best_asset_meta = results[0]["metadata"]
-                matched_assets.append({
-                    "requirement": req,
-                    "asset_name": best_asset_meta.get("name", ""),
-                    "category": best_asset_meta.get("category", "Asset"),
-                    "description": best_asset_meta.get("description", "")
-                })
-            else:
-                # LLM-guided Gap Mitigation
-                gap_mitigation_sys = (
-                    "You are a pre-sales consultant. Given a client requirement that we cannot fully "
-                    "meet with existing assets, write exactly one sentence of mitigation (e.g. recruit a specialist "
-                    "contractor or establish a new competence program)."
-                )
-                gap_mitigation_user = f"Requirement: {req}"
-                mitigation = query_llm(gap_mitigation_sys, gap_mitigation_user)
-                if not mitigation:
-                    mitigation = "Address through temporary external contractor recruitment."
-                gaps.append(f"Identified gap in Client Requirement: '{req}'. Mitigation: {mitigation.strip()}")
-
-        if not gaps:
-            gaps = ["No critical knowledge capability gaps identified. Full alignment with PwC competencies."]
-
-        # Combine vector RAG matches and gaps for final LLM confirmation
-        rag_sys_prompt = (
-            "You are a technical consultant mapping client requirements to organization capabilities.\n"
-            "Review the requirement mappings and identified gaps, and compile them into a clean JSON structure.\n"
-            "Respond ONLY as a JSON object with two keys:\n"
-            "- 'matched': a list of objects, each containing: 'requirement', 'asset_name', 'category', 'description'\n"
-            "- 'gaps': a list of strings representing the identified gaps and mitigations.\n"
-            "Do not include any markdown format blocks or introductory text."
-        )
-        rag_user_prompt = f"Requirements: {json.dumps(requirements)}\nMapped Assets: {json.dumps(matched_assets)}\nGaps List: {json.dumps(gaps)}"
+        # Run RAG Grounding and Gap Analysis
+        rag_data = req_agent.run_rag_analysis(requirements, project_duration)
+        matched = rag_data.get("matched", [])
+        gaps = rag_data.get("gaps", [])
         
-        rag_mapped_raw = query_llm(rag_sys_prompt, rag_user_prompt, json_mode=True)
-        default_rag = {
-            "matched": matched_assets,
-            "gaps": gaps
-        }
-        rag_data = safe_json_loads(rag_mapped_raw, default_rag)
-        matched = rag_data.get("matched", matched_assets)
-        gaps = rag_data.get("gaps", gaps)
+        # Analyze Advanced Options (RAG Strategy, Action Engine, Guardrails)
+        advanced_options = req_agent.analyze_advanced_options(full_document_text, requirements)
         
         logs = f"RAG Grounding complete: Mapped {len(matched)} requirement(s) to assets. Flagged {len(gaps)} gap(s)."
         update_step_status(proposal_id, "Analyzing", "completed", logs)
@@ -431,7 +369,13 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "budget": budget,
             "requirements": requirements,
             "matched_assets": matched,
-            "gaps": gaps
+            "gaps": gaps,
+            "extracted_technologies": tech_data.get("extracted_technologies", {"ui": None, "backend": None, "database": None}),
+            "tech_options": tech_data.get("tech_options", []),
+            "chat_explanation": tech_data.get("chat_explanation", ""),
+            "rag_options": advanced_options.get("rag_options", []),
+            "action_engine_options": advanced_options.get("action_engine_options", []),
+            "guardrail_options": advanced_options.get("guardrail_options", [])
         }
         update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
         
@@ -446,7 +390,7 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         for step in STEPS:
             update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
-def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, final_budget):
+def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, final_budget, selected_rag="", selected_guardrail="", selected_action_engine=""):
     """Phase 2 of Orchestration: Designing, Planning, Assembling, PPTX rendering."""
     try:
         # Retrieve the partial state
@@ -472,43 +416,22 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         # ----------------------------------------------------
         update_step_status(proposal_id, "Designing", "running", f"Designing technical solution using {ui_tech}, {backend_tech}, {db_tech}...")
         
-        design_sys_prompt = (
-            f"You are a Lead IT Architect. Based on client requirements, budget constraint, and duration, "
-            f"propose a solution design containing 3 solution pillars and a landscape architecture table.\n"
-            f"CRITICAL INSTRUCTION: You must include {ui_tech} for the Frontend, {backend_tech} for the Backend, "
-            f"and {db_tech} for the Database in your architecture.\n"
-            "Respond ONLY as a JSON object with the following keys:\n"
-            "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (sentence detail).\n"
-            "- 'architecture': a list of exactly 3 layers (e.g., 'Presentation layer (UI Client)', "
-            "'Application Logic (API Backend)', 'Data Integration & Cache Layer') where each layer object contains "
-            "'name' (string) and 'components' (list of strings representing systems/frameworks).\n"
-            "Do not include any text before or after the JSON."
+        from agents.design_agent import DesignAgent
+        design_agent = DesignAgent()
+        design_data = design_agent.generate_design(
+            ui_tech=ui_tech,
+            backend_tech=backend_tech,
+            db_tech=db_tech,
+            requirements=requirements,
+            budget=budget,
+            duration=project_duration,
+            selected_rag=selected_rag,
+            selected_guardrail=selected_guardrail,
+            selected_action_engine=selected_action_engine
         )
-        design_user_prompt = f"Requirements:\n{json.dumps(requirements)}\nBudget: {budget}\nDuration: {project_duration}"
-        
-        design_raw = query_llm(design_sys_prompt, design_user_prompt, json_mode=True)
-        if design_raw is None:
-            raise RuntimeError("Failed to connect to local Mistral LLM server for Solution Design.")
-        
-        default_pillars = [
-            {"title": "Agentic Orchestrator Engine", "desc": "Implement a stateful multi-agent orchestrator utilizing ReAct patterns to parse proposals asynchronously."},
-            {"title": "Responsive React Dashboard", "desc": "Deliver an intuitive dashboard built with React 18, Zustand, and Tailwind, offering real-time progress steps and inline document editing."},
-            {"title": "Deterministic Presentation Engine", "desc": "Compile agent decisions into a clean JSON IR, and render a pixel-perfect PPTX deck using python-pptx."}
-        ]
-        default_architecture = [
-            {"name": "Presentation layer (UI Client)", "components": ["Vite + React 18 SPA", "Zustand State", "Axios Service"]},
-            {"name": "Application Logic (API Backend)", "components": ["Flask Web Service", "Agent Control Loop", "Auth Service"]},
-            {"name": "Data Integration & Cache Layer", "components": ["MySQL Database", "python-pptx Builder", "Semantic RAG Store"]}
-        ]
-        
-        default_design = {
-            "solution_pillars": default_pillars,
-            "architecture": default_architecture
-        }
-        
-        design_data = safe_json_loads(design_raw, default_design)
-        solution_pillars = design_data.get("solution_pillars", default_pillars)
-        architecture = design_data.get("architecture", default_architecture)
+        solution_pillars = design_data.get("solution_pillars", [])
+        architecture = design_data.get("architecture", [])
+
         
         logs = f"Architectural evaluation complete. Structured solution pillars and system architecture generated."
         update_step_status(proposal_id, "Designing", "completed", logs)
@@ -526,7 +449,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "'duration' (weeks range), and 'deliverables' (key activities/deliverables text).\n"
             "- 'resources': a list of exactly 5 resource roles. Each resource object contains: "
             "'role' (string), 'loc' ('Onsite', 'Offshore', 'Hybrid'), 'fte' (decimal string, e.g., '1.00', '0.25'), "
-            "'rate' (monthly rate string, e.g., '$8,000'), and 'total' (total cost calculation for this resource as a string, e.g. '$10,000').\n"
+            "'rate' (monthly rate string, e.g., '$8,000'), 'total' (total cost calculation for this resource as a string, e.g. '$10,000'), "
+            "and 'person_days' (integer representing total estimated effort in days, e.g. 40).\n"
             "- 'skills_mapping': a list of exactly 5 skills mapping objects. Each object contains: "
             "'skill' (technical skill name), 'role' (matching project role), 'asset' (matching PwC Asset/Competency name), "
             "and 'conf' (confidence percentage string, e.g. '95%').\n"
@@ -546,11 +470,11 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             {"phase": "Phase 3: UAT & Handoff", "duration": "Weeks 11-14", "deliverables": "UAT feedback validation, performance tuning, and staging platform release."}
         ]
         default_resources = [
-            {"role": "Engagement Director", "loc": "Hybrid", "fte": "0.15", "rate": "$32,000", "total": "$21,600"},
-            {"role": "Lead Architect", "loc": "Onsite", "fte": "1.00", "rate": "$25,000", "total": "$100,000"},
-            {"role": "Senior Developer (Front-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000"},
-            {"role": "Senior Developer (Back-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000"},
-            {"role": "QA & Test Engineer", "loc": "Offshore", "fte": "1.00", "rate": "$6,000", "total": "$24,000"}
+            {"role": "Engagement Director", "loc": "Hybrid", "fte": "0.15", "rate": "$32,000", "total": "$21,600", "person_days": 10},
+            {"role": "Lead Architect", "loc": "Onsite", "fte": "1.00", "rate": "$25,000", "total": "$100,000", "person_days": 60},
+            {"role": "Senior Developer (Front-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000", "person_days": 90},
+            {"role": "Senior Developer (Back-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000", "person_days": 90},
+            {"role": "QA & Test Engineer", "loc": "Offshore", "fte": "1.00", "rate": "$6,000", "total": "$24,000", "person_days": 60}
         ]
         default_skills = [
             {"skill": "React 18 & TypeScript", "role": "Senior Developer (Front-end)", "asset": "React/TypeScript Front-End Competency", "conf": "High (95%)"},
@@ -596,6 +520,10 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "gaps": gaps,
             "solution_pillars": solution_pillars,
             "architecture": architecture,
+            "business_summary": design_data.get("business_summary", ""),
+            "data_flow": design_data.get("data_flow", []),
+            "infrastructure_approximation": design_data.get("infrastructure_approximation", []),
+            "similar_projects": design_data.get("similar_projects", []),
             "timeline_phases": timeline_phases,
             "resources": resources,
             "skills_mapping": skills_mapping
@@ -676,7 +604,9 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         out_dir = os.path.join(os.getcwd(), 'static', 'proposals')
         os.makedirs(out_dir, exist_ok=True)
         import re
-        safe_client_name = re.sub(r'[^a-zA-Z0-9]', '_', client_name).strip('_')
+        if isinstance(client_name, list):
+            client_name = client_name[0] if client_name else "Project"
+        safe_client_name = re.sub(r'[^a-zA-Z0-9]', '_', str(client_name)).strip('_')
         if not safe_client_name:
             safe_client_name = "Project"
             
