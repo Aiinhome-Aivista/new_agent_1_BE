@@ -227,39 +227,69 @@ def generate_pptx(data, output_path):
         set_font(p_desc.runs[0], size=11, color=CHARCOAL)
 
     # ----------------------------------------------------
-    # SLIDE 3B: High Level Design: Data Flow
+    # SLIDE 3B: High Level Design: Data Flow (Custom Architecture Diagram)
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "High Level Design: Data Flow", "Data processing pipeline and integration points")
-    add_footer(slide)
-
-    data_flow = data.get("data_flow", [])
     
-    if data_flow:
-        df_width = Inches(8.0 / len(data_flow))
-        for i, step in enumerate(data_flow):
-            left = Inches(1.0) + (i * df_width)
+    # Dark background
+    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
+    bg.fill.solid()
+    bg.fill.fore_color.rgb = RGBColor(15, 15, 15)
+    bg.line.fill.background()
+    
+    # Title
+    title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.8))
+    p_title = title_box.text_frame.paragraphs[0]
+    p_title.text = "High Level Design: Data Flow"
+    set_font(p_title.runs[0], size=28, bold=True, color=WHITE)
+
+    # Dynamic Data Flow Layers
+    data_flow_items = data.get("data_flow", [])
+    if data_flow_items:
+        num_items = len(data_flow_items)
+        
+        # Calculate available height
+        start_top = 1.2
+        end_bottom = 7.0
+        total_avail = end_bottom - start_top
+        
+        arrow_h = 0.3
+        
+        # Calculate dynamic box height to fit all items perfectly
+        box_h = (total_avail - ((num_items - 1) * arrow_h)) / num_items
+        
+        # Fallback if too many items
+        if box_h < 0.4:
+            box_h = 0.4
+            arrow_h = 0.1
             
-            # Step Box
-            s_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, Inches(2.5), df_width - Inches(0.2), Inches(2.0))
-            s_box.fill.solid()
-            s_box.fill.fore_color.rgb = OFF_WHITE
-            s_box.line.color.rgb = ORANGE
-            s_box.line.width = Pt(1.5)
+        current_top = start_top
+        
+        for i, item_text in enumerate(data_flow_items):
+            # Draw Box
+            box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(current_top), Inches(9.0), Inches(box_h))
+            box.fill.solid()
+            box.fill.fore_color.rgb = RGBColor(30, 30, 30)
+            box.line.color.rgb = RGBColor(120, 120, 120)
+            box.line.width = Pt(1.5)
             
-            tf_s = s_box.text_frame
-            tf_s.word_wrap = True
-            p_s = tf_s.paragraphs[0]
-            p_s.text = safe_text(step)
-            p_s.alignment = PP_ALIGN.CENTER
-            set_font(p_s.runs[0], size=11, bold=True, color=CHARCOAL)
+            # Text inside box
+            tb = slide.shapes.add_textbox(Inches(0.6), Inches(current_top + (box_h / 2) - 0.2), Inches(8.8), Inches(0.4))
+            p = tb.text_frame.paragraphs[0]
+            p.text = safe_text(item_text)
+            p.alignment = PP_ALIGN.CENTER
+            set_font(p.runs[0], size=12, bold=True, color=WHITE)
             
-            # Arrow
-            if i < len(data_flow) - 1:
-                arrow = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, left + df_width - Inches(0.15), Inches(3.3), Inches(0.2), Inches(0.4))
-                arrow.fill.solid()
-                arrow.fill.fore_color.rgb = GOLD
-                arrow.line.fill.background()
+            current_top += box_h
+            
+            # Draw downward arrow if not the last item
+            if i < num_items - 1:
+                arr = slide.shapes.add_textbox(Inches(4.8), Inches(current_top), Inches(0.4), Inches(arrow_h))
+                pa = arr.text_frame.paragraphs[0]
+                pa.text = "▼"
+                pa.alignment = PP_ALIGN.CENTER
+                set_font(pa.runs[0], size=12, bold=True, color=ORANGE)
+                current_top += arrow_h
 
     # ----------------------------------------------------
     # SLIDE 4: Landscape Architecture
@@ -541,6 +571,125 @@ def generate_pptx(data, output_path):
             p.text = safe_text(val)
             p.alignment = PP_ALIGN.CENTER if j == 3 else PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
+
+    # ----------------------------------------------------
+    # DYNAMIC COMPLEX ARCHITECTURE DIAGRAMS
+    # ----------------------------------------------------
+    complex_diagrams = data.get("complex_diagrams", [])
+    for diag in complex_diagrams:
+        slide = prs.slides.add_slide(blank_slide_layout)
+        
+        # Background
+        bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
+        bg.fill.solid()
+        bg.fill.fore_color.rgb = RGBColor(248, 249, 250)
+        bg.line.fill.background()
+        
+        create_slide_header(slide, safe_text(diag.get("title", "Architecture Diagram")), "Dynamic Architecture generated from AI Payload")
+        add_footer(slide)
+        
+        columns = diag.get("columns", [])
+        if not columns:
+            continue
+            
+        # Total width ratios
+        total_ratio = sum(col.get("width_ratio", 1.0) for col in columns)
+        
+        # Working area: Left 0.5, Right 9.5 -> width = 9.0
+        # Top 1.2, Bottom 6.8 -> height = 5.6
+        avail_width = 9.0
+        start_x = 0.5
+        
+        for col in columns:
+            ratio = col.get("width_ratio", 1.0)
+            col_width = (ratio / total_ratio) * avail_width
+            
+            # Draw Column Header
+            c_header = slide.shapes.add_textbox(Inches(start_x), Inches(1.0), Inches(col_width - 0.1), Inches(0.4))
+            p_ch = c_header.text_frame.paragraphs[0]
+            p_ch.text = safe_text(col.get("name", ""))
+            p_ch.alignment = PP_ALIGN.CENTER
+            set_font(p_ch.runs[0], size=12, bold=True, color=CHARCOAL)
+            
+            zones = col.get("zones", [])
+            if zones:
+                zone_h = 5.4 / len(zones)
+                current_y = 1.4
+                
+                for zone in zones:
+                    bg_color_str = zone.get("bg_color", "transparent")
+                    if bg_color_str == "light_green":
+                        fill_color = RGBColor(220, 235, 200)
+                    elif bg_color_str == "light_grey":
+                        fill_color = RGBColor(230, 230, 230)
+                    elif bg_color_str == "light_blue":
+                        fill_color = RGBColor(210, 230, 250)
+                    elif bg_color_str == "white":
+                        fill_color = RGBColor(255, 255, 255)
+                    else:
+                        fill_color = None
+                        
+                    if fill_color:
+                        z_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(start_x), Inches(current_y), Inches(col_width - 0.1), Inches(zone_h - 0.1))
+                        z_box.fill.solid()
+                        z_box.fill.fore_color.rgb = fill_color
+                        z_box.line.color.rgb = GREY
+                        z_box.line.width = Pt(1)
+                    else:
+                        # transparent dashed border
+                        z_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(start_x), Inches(current_y), Inches(col_width - 0.1), Inches(zone_h - 0.1))
+                        z_box.fill.background()
+                        z_box.line.color.rgb = GREY
+                        z_box.line.width = Pt(1)
+                        # dash_style 2 is dashed
+                        try:
+                            z_box.line.dash_style = 2
+                        except:
+                            pass
+                    
+                    # Zone Title
+                    z_title = slide.shapes.add_textbox(Inches(start_x), Inches(current_y), Inches(col_width - 0.1), Inches(0.3))
+                    p_zt = z_title.text_frame.paragraphs[0]
+                    p_zt.text = safe_text(zone.get("name", ""))
+                    set_font(p_zt.runs[0], size=10, bold=True, color=CHARCOAL)
+                    
+                    items = zone.get("items", [])
+                    if items:
+                        # simple vertical or 2x2 grid
+                        cols_grid = 2 if len(items) > 3 else 1
+                        item_w = (col_width - 0.4) / cols_grid
+                        item_h = 0.6
+                        
+                        for idx, item in enumerate(items):
+                            r = idx // cols_grid
+                            c = idx % cols_grid
+                            ix = start_x + 0.15 + (c * (item_w + 0.1))
+                            iy = current_y + 0.4 + (r * (item_h + 0.2))
+                            
+                            shape_type_str = item.get("shape", "box")
+                            if shape_type_str == "database":
+                                stype = MSO_SHAPE.CAN
+                            elif shape_type_str == "cloud":
+                                stype = MSO_SHAPE.CLOUD
+                            else:
+                                stype = MSO_SHAPE.ROUNDED_RECTANGLE
+                                
+                            item_box = slide.shapes.add_shape(stype, Inches(ix), Inches(iy), Inches(item_w), Inches(item_h))
+                            item_box.fill.solid()
+                            item_box.fill.fore_color.rgb = WHITE
+                            item_box.line.color.rgb = ORANGE
+                            item_box.line.width = Pt(1.5)
+                            
+                            # Item Text
+                            it = slide.shapes.add_textbox(Inches(ix), Inches(iy + item_h/2 - 0.2), Inches(item_w), Inches(0.4))
+                            pit = it.text_frame.paragraphs[0]
+                            pit.text = safe_text(item.get("name", ""))
+                            pit.alignment = PP_ALIGN.CENTER
+                            set_font(pit.runs[0], size=9, bold=True, color=CHARCOAL)
+                            
+                    current_y += zone_h
+            
+            start_x += col_width
 
     # Save presentation
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

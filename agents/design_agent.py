@@ -44,7 +44,8 @@ class DesignAgent:
                 "'Application Logic (API Backend)', 'Data Integration & Cache Layer') where each layer object contains "
                 "'name' (string) and 'components' (list of strings representing systems/frameworks).\n"
                 "- 'infrastructure_approximation': a list of exactly 3 objects, each with 'component', 'spec', and 'estimated_monthly_cost'.\n"
-                "- 'similar_projects': a list of exactly 2 objects, each with 'client_industry', 'project_name', and 'outcome'.\n\n"
+                "- 'similar_projects': a list of exactly 2 objects, each with 'client_industry', 'project_name', and 'outcome'.\n"
+                "- 'complex_diagrams': a list of exactly 2 complex architecture diagram objects (e.g. Reference Architecture, Cloud Architecture). Each object must have a 'title' string, and a 'columns' list. Each column has 'name', 'width_ratio' (float), and a 'zones' list. Each zone has 'name', optional 'bg_color' (e.g., 'light_green', 'light_blue', 'light_grey', 'white'), and an 'items' list. Each item has 'name' and 'shape' (must be one of: 'box', 'database', 'cloud').\n\n"
                 "Do not include any explanation or markdown formatting outside the JSON."
             )),
             ("user", "Requirements:\n{requirements}\n\nBudget: {budget}\nDuration: {duration}")
@@ -109,7 +110,8 @@ class DesignAgent:
                 "data_flow": design_data.get("data_flow", default_data_flow),
                 "architecture": arch,
                 "infrastructure_approximation": design_data.get("infrastructure_approximation", default_infrastructure),
-                "similar_projects": design_data.get("similar_projects", default_similar_projects)
+                "similar_projects": design_data.get("similar_projects", default_similar_projects),
+                "complex_diagrams": design_data.get("complex_diagrams", [])
             }
         except Exception as e:
             print(f"Error in Solution Design Agent: {e}")
@@ -119,5 +121,6 @@ class DesignAgent:
                 "data_flow": default_data_flow,
                 "architecture": default_architecture,
                 "infrastructure_approximation": default_infrastructure,
-                "similar_projects": default_similar_projects
+                "similar_projects": default_similar_projects,
+                "complex_diagrams": []
             }

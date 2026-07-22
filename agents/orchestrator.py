@@ -526,7 +526,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "similar_projects": design_data.get("similar_projects", []),
             "timeline_phases": timeline_phases,
             "resources": resources,
-            "skills_mapping": skills_mapping
+            "skills_mapping": skills_mapping,
+            "complex_diagrams": design_data.get("complex_diagrams", [])
         }
         
         reflexion_sys_prompt = (
