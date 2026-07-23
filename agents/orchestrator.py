@@ -544,8 +544,10 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         
         final_ir_raw = query_llm(reflexion_sys_prompt, reflexion_user_prompt, json_mode=True)
         if final_ir_raw is None:
-            raise RuntimeError("Failed to connect to local Mistral LLM server for Reflexion validation.")
-        final_ir_data = safe_json_loads(final_ir_raw, draft_ir)
+            print("Warning: Failed to connect to local Mistral LLM server for Reflexion validation. Falling back to draft IR.")
+            final_ir_data = draft_ir
+        else:
+            final_ir_data = safe_json_loads(final_ir_raw, draft_ir)
         
         # Python math override to ensure totals match budget
         import re
