@@ -26,3 +26,25 @@ def test_static_routes():
     response = client.get('/static/test.txt')
     # Should be 404 since file doesn't exist, but routing matches
     assert response.status_code == 404
+
+def test_upload_proposal_with_requirements_text():
+    """Verify that uploading a proposal with typed requirements text is handled successfully."""
+    client = app.test_client()
+    
+    headers = {
+        "X-User-Role": "admin"
+    }
+    
+    data = {
+        "client_name": "Test Client",
+        "project_duration": "10 Weeks",
+        "budget": "$150,000",
+        "requirements_text": "Need a secure payment integration with Stripe and dual-region failover configuration."
+    }
+    
+    response = client.post('/api/proposals/upload', data=data, headers=headers)
+    assert response.status_code == 202
+    res_data = response.get_json()
+    assert "proposal_id" in res_data
+    assert "message" in res_data
+

@@ -21,6 +21,7 @@ def upload_proposal():
         client_name = request.form.get("client_name")
         project_duration = request.form.get("project_duration")
         budget = request.form.get("budget")
+        requirements_text = request.form.get("requirements_text")
         
         if not client_name or client_name.strip() == "":
             client_name = "Extracting Client Name..."
@@ -66,7 +67,8 @@ def upload_proposal():
             client_name=client_name,
             project_duration=project_duration,
             budget=budget,
-            files_info=uploaded_files
+            files_info=uploaded_files,
+            requirements_text=requirements_text
         )
         
         return jsonify({

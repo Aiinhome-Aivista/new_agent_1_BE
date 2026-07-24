@@ -207,7 +207,7 @@ def safe_json_loads(json_str, fallback):
         print(f"Failed to parse JSON: {e}. Raw content: {json_str}")
         return fallback
 
-def run_orchestration(proposal_id, client_name, project_duration, budget, files_info):
+def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None):
     """The full Multi-Agent pipeline, executing step-by-step using LLM and fallback defaults."""
     try:
         # Initialize LangChain Agents
@@ -288,6 +288,56 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                             }
                             arango_client.insert("documents", doc_record)
         
+        # Process typed requirements_text if provided
+        if requirements_text and requirements_text.strip():
+            txt = requirements_text.strip()
+            orig_name = "Typed_Requirements"
+            parsed_files += 1
+            extracted_text_blocks.append(f"--- Typed Requirements ---\n{txt}")
+            
+            # Smart Chunking and Classification
+            chunks = chunk_text(txt, chunk_size=1000, overlap=100)
+            from database.vector_client import store_embedding
+            for idx, chunk in enumerate(chunks):
+                classification = intake_agent.classify_chunk(chunk)
+                embedding = get_embedding(chunk)
+                chunk_id = f"{proposal_id}_{orig_name}_{idx}"
+                
+                # Save to ArangoDB chunks collection
+                if arango_client.is_connected:
+                    chunk_doc = {
+                        "_key": chunk_id,
+                        "proposal_id": proposal_id,
+                        "filename": orig_name,
+                        "chunk_index": idx,
+                        "text": chunk,
+                        "classification": classification,
+                        "embedding": embedding
+                    }
+                    arango_client.insert("chunks", chunk_doc)
+                
+                # Save to ChromaDB
+                store_embedding(
+                    collection_name="chunks",
+                    doc_id=chunk_id,
+                    text=chunk,
+                    metadata={
+                        "proposal_id": proposal_id,
+                        "filename": orig_name,
+                        "classification": classification
+                    }
+                )
+                total_chunks_stored += 1
+            
+            # Save document record to ArangoDB
+            if arango_client.is_connected:
+                doc_record = {
+                    "proposal_id": proposal_id,
+                    "filename": orig_name,
+                    "character_count": len(txt)
+                }
+                arango_client.insert("documents", doc_record)
+
         full_document_text = "\n\n".join(extracted_text_blocks).strip()
         
         # Validation
@@ -635,11 +685,11 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
 
-def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info):
+def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None):
     """Triggers the orchestrator thread asynchronously so UI remains non-blocking."""
     thread = threading.Thread(
         target=run_orchestration,
-        args=(proposal_id, client_name, project_duration, budget, files_info)
+        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text)
     )
     thread.daemon = True
     thread.start()
