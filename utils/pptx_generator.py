@@ -69,6 +69,283 @@ def add_footer(slide):
     p.alignment = PP_ALIGN.LEFT
     set_font(p.runs[0], size=8, bold=False, color=CHARCOAL)
 
+
+def add_reference_architecture_slide(slide, prs):
+    # Background
+    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
+    bg.fill.solid()
+    bg.fill.fore_color.rgb = WHITE
+    bg.line.fill.background()
+
+    create_slide_header(slide, "Reference Architecture", "Enterprise logical data patterns")
+    add_footer(slide)
+
+    # Cloud Box (Light Green)
+    cloud_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.2), Inches(1.3), Inches(4.5), Inches(3.4))
+    cloud_box.fill.solid()
+    cloud_box.fill.fore_color.rgb = RGBColor(238, 247, 233)
+    cloud_box.line.color.rgb = RGBColor(200, 220, 190)
+    p = cloud_box.text_frame.paragraphs[0]
+    p.text = "CLOUD"
+    p.alignment = PP_ALIGN.LEFT
+    set_font(p.runs[0], size=8, bold=True)
+    
+    # ON-PREM Box (Light Grey)
+    onprem_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.2), Inches(4.8), Inches(4.5), Inches(2.0))
+    onprem_box.fill.solid()
+    onprem_box.fill.fore_color.rgb = RGBColor(245, 245, 245)
+    onprem_box.line.color.rgb = GREY
+    p = onprem_box.text_frame.paragraphs[0]
+    p.text = "ON-PREM (Optional)"
+    p.alignment = PP_ALIGN.LEFT
+    set_font(p.runs[0], size=8, bold=True)
+    
+    # External Data Sources
+    tx = slide.shapes.add_textbox(Inches(0.2), Inches(1.3), Inches(1.5), Inches(0.4))
+    p = tx.text_frame.paragraphs[0]
+    p.text = "External Data\nSources"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=10, bold=True)
+    
+    # Internal Data Sources
+    tx2 = slide.shapes.add_textbox(Inches(0.2), Inches(4.8), Inches(1.5), Inches(0.4))
+    p2 = tx2.text_frame.paragraphs[0]
+    p2.text = "Internal Data\nSources"
+    p2.alignment = PP_ALIGN.CENTER
+    set_font(p2.runs[0], size=10, bold=True)
+
+    # Some Data source DBs
+    ds1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.6), Inches(2.0), Inches(0.7), Inches(0.8))
+    ds1.fill.solid()
+    ds1.fill.fore_color.rgb = WHITE
+    ds1.line.color.rgb = CHARCOAL
+    
+    # Raw Data Zone
+    raw_zone = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.5), Inches(1.6), Inches(1.3), Inches(1.7))
+    raw_zone.fill.solid()
+    raw_zone.fill.fore_color.rgb = WHITE
+    raw_zone.line.color.rgb = GREY
+    
+    tx_raw = slide.shapes.add_textbox(Inches(2.5), Inches(1.6), Inches(1.3), Inches(0.3))
+    p = tx_raw.text_frame.paragraphs[0]
+    p.text = "RAW DATA ZONE"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=8, bold=True)
+    
+    tx_raw_os = slide.shapes.add_textbox(Inches(2.5), Inches(2.9), Inches(1.3), Inches(0.3))
+    p = tx_raw_os.text_frame.paragraphs[0]
+    p.text = "Object Storage"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=8, bold=False)
+
+    # Database in Raw Data Zone
+    raw_db = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(2.8), Inches(2.0), Inches(0.7), Inches(0.8))
+    raw_db.fill.solid()
+    raw_db.fill.fore_color.rgb = WHITE
+    raw_db.line.color.rgb = ORANGE
+    p = raw_db.text_frame.paragraphs[0]
+    p.text = "Raw DB"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=7, bold=True)
+
+    # Curated Zone
+    cur_zone = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(4.0), Inches(1.6), Inches(1.3), Inches(1.7))
+    cur_zone.fill.solid()
+    cur_zone.fill.fore_color.rgb = WHITE
+    cur_zone.line.color.rgb = GREY
+    
+    tx_cur = slide.shapes.add_textbox(Inches(4.0), Inches(1.6), Inches(1.3), Inches(0.3))
+    p = tx_cur.text_frame.paragraphs[0]
+    p.text = "CURATED ZONE"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=8, bold=True)
+    
+    tx_cur_os = slide.shapes.add_textbox(Inches(4.0), Inches(2.9), Inches(1.3), Inches(0.3))
+    p = tx_cur_os.text_frame.paragraphs[0]
+    p.text = "Object Storage"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=8, bold=False)
+
+    cur_db = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(4.3), Inches(2.0), Inches(0.7), Inches(0.8))
+    cur_db.fill.solid()
+    cur_db.fill.fore_color.rgb = WHITE
+    cur_db.line.color.rgb = ORANGE
+    p = cur_db.text_frame.paragraphs[0]
+    p.text = "Curated DB"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=7, bold=True)
+
+    # Datamarts
+    dm_zone = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(5.6), Inches(1.6), Inches(0.9), Inches(2.9))
+    dm_zone.fill.solid()
+    dm_zone.fill.fore_color.rgb = RGBColor(250, 250, 250)
+    dm_zone.line.color.rgb = GREY
+    
+    tx_dm = slide.shapes.add_textbox(Inches(5.6), Inches(1.6), Inches(0.9), Inches(0.3))
+    p = tx_dm.text_frame.paragraphs[0]
+    p.text = "DATAMARTS"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=8, bold=True)
+    
+    dm1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.8), Inches(2.0), Inches(0.5), Inches(0.6))
+    dm1.fill.solid(); dm1.fill.fore_color.rgb = WHITE; dm1.line.color.rgb = CHARCOAL
+    dm2 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.8), Inches(2.8), Inches(0.5), Inches(0.6))
+    dm2.fill.solid(); dm2.fill.fore_color.rgb = WHITE; dm2.line.color.rgb = CHARCOAL
+    dm3 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.8), Inches(3.6), Inches(0.5), Inches(0.6))
+    dm3.fill.solid(); dm3.fill.fore_color.rgb = WHITE; dm3.line.color.rgb = CHARCOAL
+
+    # Data flow lines (Arrows)
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.4), Inches(2.4), Inches(1.0), Inches(0.15))
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.4), Inches(5.0), Inches(1.0), Inches(0.15))
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(3.8), Inches(2.4), Inches(0.2), Inches(0.15))
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(5.3), Inches(2.4), Inches(0.3), Inches(0.15))
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(6.5), Inches(2.4), Inches(0.5), Inches(0.15))
+
+    # Use Cases
+    tx3 = slide.shapes.add_textbox(Inches(7.3), Inches(1.3), Inches(2.0), Inches(0.4))
+    p3 = tx3.text_frame.paragraphs[0]
+    p3.text = "Use Cases"
+    p3.alignment = PP_ALIGN.CENTER
+    set_font(p3.runs[0], size=10, bold=True)
+
+    use_cases = ["Cloud API", "Data & service exchange", "Advanced Analytics", "IoT Apps", "Business Intelligence", "3rd Party Apps"]
+    for i, uc in enumerate(use_cases):
+        r = i // 2
+        c = i % 2
+        uc_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(7.0 + c*1.3), Inches(1.8 + r*0.8), Inches(1.2), Inches(0.6))
+        uc_box.fill.solid()
+        uc_box.fill.fore_color.rgb = RGBColor(245, 250, 245)
+        uc_box.line.color.rgb = GREY
+        p = uc_box.text_frame.paragraphs[0]
+        p.text = uc
+        p.alignment = PP_ALIGN.CENTER
+        set_font(p.runs[0], size=8)
+
+
+def add_azure_landscape_architecture_slide(slide, prs):
+    bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
+    bg.fill.solid()
+    bg.fill.fore_color.rgb = WHITE
+    bg.line.fill.background()
+
+    create_slide_header(slide, "Landscape Architecture (Azure Cloud Platform)", "Azure Native Services & Integration Topology")
+    add_footer(slide)
+    
+    azure_blue = RGBColor(0, 114, 198)
+
+    # Left: SAP HANA, SAP Ariba, Digital Apps
+    sap1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.5), Inches(1.8), Inches(1.0), Inches(1.0))
+    sap1.fill.solid()
+    sap1.fill.fore_color.rgb = WHITE
+    sap1.line.color.rgb = azure_blue
+    p = sap1.text_frame.paragraphs[0]
+    p.text = "SAP HANA"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=9, bold=True)
+    
+    sap2 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.5), Inches(3.2), Inches(1.0), Inches(1.0))
+    sap2.fill.solid()
+    sap2.fill.fore_color.rgb = WHITE
+    sap2.line.color.rgb = azure_blue
+    p = sap2.text_frame.paragraphs[0]
+    p.text = "SAP Ariba"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=9, bold=True)
+
+    app1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.5), Inches(4.6), Inches(1.0), Inches(1.0))
+    app1.fill.solid()
+    app1.fill.fore_color.rgb = WHITE
+    app1.line.color.rgb = azure_blue
+    p = app1.text_frame.paragraphs[0]
+    p.text = "Digital Apps"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=9, bold=True)
+
+    # Middle: ELT / Orchestration Tool (Azure Data Factory)
+    adf_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.3), Inches(1.5), Inches(2.2), Inches(2.8))
+    adf_box.fill.solid()
+    adf_box.fill.fore_color.rgb = WHITE
+    adf_box.line.color.rgb = azure_blue
+    try:
+        adf_box.line.dash_style = 2
+    except:
+        pass
+        
+    tx_adf = slide.shapes.add_textbox(Inches(2.3), Inches(3.7), Inches(2.2), Inches(0.4))
+    p = tx_adf.text_frame.paragraphs[0]
+    p.text = "ELT/Orchestration Tool"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=10, bold=True)
+
+    adf_icon = slide.shapes.add_shape(MSO_SHAPE.CLOUD, Inches(2.8), Inches(1.8), Inches(1.2), Inches(0.9))
+    adf_icon.fill.solid()
+    adf_icon.fill.fore_color.rgb = azure_blue
+    p = adf_icon.text_frame.paragraphs[0]
+    p.text = "ADF"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=10, color=WHITE, bold=True)
+
+    # Azure SQL Server
+    sql_box = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.2), Inches(1.2), Inches(1.2), Inches(1.2))
+    sql_box.fill.solid()
+    sql_box.fill.fore_color.rgb = WHITE
+    sql_box.line.color.rgb = azure_blue
+    
+    tx_sql = slide.shapes.add_textbox(Inches(5.2), Inches(1.5), Inches(1.2), Inches(0.6))
+    p = tx_sql.text_frame.paragraphs[0]
+    p.text = "SQL Server"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=9, bold=True)
+    
+    # Pyramid / Triangle for Azure Synapse
+    syn_box = slide.shapes.add_shape(MSO_SHAPE.ISOSCELES_TRIANGLE, Inches(6.8), Inches(2.2), Inches(2.5), Inches(3.5))
+    syn_box.fill.solid()
+    syn_box.fill.fore_color.rgb = RGBColor(220, 235, 250)
+    syn_box.line.color.rgb = azure_blue
+    
+    tx_syn = slide.shapes.add_textbox(Inches(6.8), Inches(3.2), Inches(2.5), Inches(1.5))
+    p = tx_syn.text_frame.paragraphs[0]
+    p.text = "Reporting Layer\n\nCommon Data\n\nRAW Layer"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=9, bold=True, color=CHARCOAL)
+    
+    # Tableau
+    tab_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(8.2), Inches(1.5), Inches(1.5), Inches(1.2))
+    tab_box.fill.solid()
+    tab_box.fill.fore_color.rgb = WHITE
+    tab_box.line.color.rgb = GREY
+    try:
+        tab_box.line.dash_style = 2
+    except:
+        pass
+        
+    tx_tab = slide.shapes.add_textbox(Inches(8.2), Inches(1.6), Inches(1.5), Inches(1.0))
+    p = tx_tab.text_frame.paragraphs[0]
+    p.text = "+ tableau\n\nReporting"
+    p.alignment = PP_ALIGN.CENTER
+    set_font(p.runs[0], size=10, bold=True)
+
+    # Data flow arrows
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.5), Inches(2.3), Inches(0.8), Inches(0.15))
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.5), Inches(3.7), Inches(0.8), Inches(0.15))
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.5), Inches(5.1), Inches(0.8), Inches(0.15))
+    
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(4.5), Inches(2.9), Inches(2.2), Inches(0.15)) # to Synapse
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(4.5), Inches(1.8), Inches(0.7), Inches(0.15)) # to SQL
+    
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(6.4), Inches(2.2), Inches(0.6), Inches(0.15)) # SQL to Synapse
+    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(9.0), Inches(2.6), Inches(0.5), Inches(0.15)) # Synapse to Tableau
+
+    # Legend
+    leg_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(7.5), Inches(6.0), Inches(2.2), Inches(1.2))
+    leg_box.fill.solid()
+    leg_box.fill.fore_color.rgb = RGBColor(250, 240, 230)
+    leg_box.line.color.rgb = ORANGE
+    p = leg_box.text_frame.paragraphs[0]
+    p.text = "Legend\nDaily\n3 hours Batch\nOne time"
+    set_font(p.runs[0], size=9)
+
+
 def generate_pptx(data, output_path):
     prs = Presentation()
     # Standard 4:3 is default, let's change to 16:9 widescreen
@@ -690,6 +967,17 @@ def generate_pptx(data, output_path):
                     current_y += zone_h
             
             start_x += col_width
+
+    # ----------------------------------------------------
+    # HARDCODED "SAME TO SAME" ARCHITECTURE DIAGRAMS
+    # ----------------------------------------------------
+    # Slide 8: Reference Architecture
+    ref_slide = prs.slides.add_slide(blank_slide_layout)
+    add_reference_architecture_slide(ref_slide, prs)
+
+    # Slide 9: Azure Landscape Architecture
+    azure_slide = prs.slides.add_slide(blank_slide_layout)
+    add_azure_landscape_architecture_slide(azure_slide, prs)
 
     # Save presentation
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

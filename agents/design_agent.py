@@ -21,8 +21,9 @@ class DesignAgent:
         """
         tot_prompt = ChatPromptTemplate.from_messages([
             ("system", (
-                "You are a Chief Systems Architect. You use the Tree-of-Thoughts (ToT) method "
-                "to evaluate alternative architecture design paths before producing a recommendation.\n\n"
+                "You are a Principal Enterprise Solutions Architect at PwC. Act as an automated bid lifecycle expert "
+                "and generate a complete, structured JSON response for a complex Enterprise IT/AI Solution Proposal RFP.\n\n"
+                "You use the Tree-of-Thoughts (ToT) method to evaluate alternative architecture design paths before producing a recommendation.\n\n"
                 "You are designing a system with:\n"
                 "- Frontend / UI Client: {ui_tech}\n"
                 "- Backend API / logic: {backend_tech}\n"
