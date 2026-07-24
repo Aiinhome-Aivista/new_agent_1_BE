@@ -5,22 +5,52 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
+MISTRAL_MODE = os.getenv("MISTRAL_MODE", "Local")
 MISTRAL_LOCAL_URL = os.getenv("MISTRAL_LOCAL_URL")
 MISTRAL_LOCAL_MODEL = os.getenv("MISTRAL_LOCAL_MODEL")
-
-if not MISTRAL_LOCAL_URL or not MISTRAL_LOCAL_MODEL:
-    raise ValueError("MISTRAL_LOCAL_URL or MISTRAL_LOCAL_MODEL is not set in the .env file")
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+MODEL_NAME = os.getenv("MODEL_NAME", "mistral-small-latest")
 
 def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json_mode=False):
     """
-    Sends a chat completion request to the local Mistral LLM endpoint.
-    If the endpoint is down, it returns None, enabling the orchestrator to fall back to static/heuristic mocks.
+    Sends a chat completion request to the chosen Mistral LLM endpoint.
     """
     headers = {
         "Content-Type": "application/json"
     }
+
+    if MISTRAL_MODE.lower() == "cloud":
+        url = "https://api.mistral.ai/v1/chat/completions"
+        headers["Authorization"] = f"Bearer {MISTRAL_API_KEY}"
+        payload = {
+            "model": MODEL_NAME,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+        
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+            
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=300)
+            if response.status_code == 200:
+                res_json = response.json()
+                choices = res_json.get("choices", [])
+                if choices:
+                    return choices[0].get("message", {}).get("content", "")
+                return None
+            else:
+                print(f"Mistral Cloud API failed with status {response.status_code}: {response.text}")
+                return None
+        except Exception as e:
+            print(f"Mistral Cloud API request exception: {e}")
+            return None
     
-    # Try Ollama endpoint format first
+    # Try Ollama endpoint format first for Local Mode
     url_ollama = f"{MISTRAL_LOCAL_URL.rstrip('/')}/api/chat"
     payload_ollama = {
         "model": MISTRAL_LOCAL_MODEL,
@@ -49,7 +79,7 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
         print(f"Ollama API request exception: {e}")
         pass # Fallback to OpenAI API format
         
-    # Try OpenAI format
+    # Try OpenAI format for Local Mode
     url_openai = f"{MISTRAL_LOCAL_URL.rstrip('/')}/v1/chat/completions"
     payload_openai = {
         "model": MISTRAL_LOCAL_MODEL,

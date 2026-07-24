@@ -383,10 +383,6 @@ def generate_pptx(data, output_path):
     p_main.text = safe_text(data.get("proposal_title", "Autonomous Solution Design"))
     set_font(p_main.runs[0], size=36, bold=True, color=WHITE)
     
-    p_sub = tf.add_paragraph()
-    p_sub.text = f"Prepared for: {safe_text(data.get('client_name', 'Enterprise Client'))}"
-    set_font(p_sub.runs[0], size=18, color=LIGHT_GREY)
-    
     p_meta = tf.add_paragraph()
     p_meta.text = f"\nTimeline: {safe_text(data.get('project_duration', 'N/A'))}  |  Target Budget: {safe_text(data.get('budget', 'N/A'))}\nDraft Date: July 2026"
     set_font(p_meta.runs[0], size=11, color=ORANGE)
@@ -436,14 +432,20 @@ def generate_pptx(data, output_path):
         p_item.text = f"• {safe_text(req)}"
         set_font(p_item.runs[0], size=11, color=CHARCOAL)
 
-    # Gaps and Matches (Right panel)
-    gap_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(5.2), Inches(1.3), Inches(4.3), Inches(5.5))
+    # ----------------------------------------------------
+    # SLIDE 3: Capability Gaps & Mitigations
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "Capability Gaps & Mitigations", "Identified gaps against RFP requirements and proposed mitigations")
+    add_footer(slide)
+
+    gap_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(1.3), Inches(9.0), Inches(5.5))
     gap_box.fill.solid()
     gap_box.fill.fore_color.rgb = OFF_WHITE
     gap_box.line.color.rgb = CHARCOAL
     gap_box.line.width = Pt(1)
 
-    gap_title = slide.shapes.add_textbox(Inches(5.3), Inches(1.4), Inches(4.1), Inches(5.2))
+    gap_title = slide.shapes.add_textbox(Inches(0.6), Inches(1.4), Inches(8.8), Inches(5.2))
     tf_gap = gap_title.text_frame
     tf_gap.word_wrap = True
     p_gap = tf_gap.paragraphs[0]
@@ -602,6 +604,14 @@ def generate_pptx(data, output_path):
         p_hdr.alignment = PP_ALIGN.CENTER
         set_font(p_hdr.runs[0], size=11, bold=True, color=WHITE)
         
+        # Add downward arrow if not the last layer
+        if i < len(arch_layers[:4]) - 1:
+            arr = slide.shapes.add_shape(MSO_SHAPE.DOWN_ARROW, Inches(1.6), top + Inches(1.05), Inches(0.3), Inches(0.2))
+            arr.fill.solid()
+            arr.fill.fore_color.rgb = ORANGE
+            arr.line.fill.background()
+
+        
         # Component boxes inside the layer
         comps = layer.get("components", [])
         if comps:
@@ -620,10 +630,10 @@ def generate_pptx(data, output_path):
                 set_font(p_comp.runs[0], size=10, bold=True, color=CHARCOAL)
 
     # ----------------------------------------------------
-    # SLIDE 4B: Infrastructure Approximation
+    # SLIDE 4B: Azure Cost Calculator (Estimations)
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Infrastructure Approximation", "Estimated cloud infrastructure components and costs")
+    create_slide_header(slide, "Azure Cost Calculator (Estimations)", "Estimated cloud infrastructure components and costs")
     add_footer(slide)
 
     infra_items = data.get("infrastructure_approximation", [])
@@ -638,7 +648,7 @@ def generate_pptx(data, output_path):
         i_table.columns[1].width = Inches(3.5)
         i_table.columns[2].width = Inches(2.0)
         
-        i_headers = ["Component", "Specification", "Est. Monthly Cost"]
+        i_headers = ["Azure Component", "Specification", "Est. Monthly Cost"]
         for j, hdr in enumerate(i_headers):
             cell = i_table.cell(0, j)
             cell.fill.solid()
@@ -661,23 +671,25 @@ def generate_pptx(data, output_path):
                 set_font(p.runs[0], size=11, color=CHARCOAL)
 
     # ----------------------------------------------------
-    # SLIDE 5: Project Timeline
+    # SLIDE 5: Project Milestones
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Project Timeline", "Sequential delivery phases and target deliverables")
+    create_slide_header(slide, "Project Milestones", "Sequential delivery phases and target deliverables")
     add_footer(slide)
 
     phases = data.get("timeline_phases", [
-        {"phase": "Phase 1: Inception & Discovery", "duration": "Weeks 1-4", "deliverables": "Parsed specifications, initial architectural blueprint"},
-        {"phase": "Phase 2: Core Engineering & RAG Setup", "duration": "Weeks 5-12", "deliverables": "Database sync, orchestration engines integration"},
-        {"phase": "Phase 3: UAT & Client Handover", "duration": "Weeks 13-16", "deliverables": "Production deployment, final document sign-off"}
+        {"phase": "Phase 1: Discovery & Setup", "duration": "Weeks 1-3", "deliverables": "RFP requirements analysis"},
+        {"phase": "Phase 2: Development", "duration": "Weeks 4-8", "deliverables": "Core engineering & integration"},
+        {"phase": "Phase 3: Testing", "duration": "Weeks 9-11", "deliverables": "QA and Integration Testing"},
+        {"phase": "Phase 4: Deployment", "duration": "Weeks 12-13", "deliverables": "Production release"},
+        {"phase": "Phase 5: Training", "duration": "Week 14", "deliverables": "User training & handover"}
     ])
 
-    for i, phase in enumerate(phases[:3]):
-        top = Inches(1.5 + (i * 1.7))
+    for i, phase in enumerate(phases[:5]):
+        top = Inches(1.5 + (i * 1.1))
         
         # Chevron Phase Box
-        c_shape = slide.shapes.add_shape(MSO_SHAPE.CHEVRON, Inches(0.5), top, Inches(3.2), Inches(1.3))
+        c_shape = slide.shapes.add_shape(MSO_SHAPE.CHEVRON, Inches(0.5), top, Inches(3.2), Inches(0.9))
         c_shape.fill.solid()
         c_shape.fill.fore_color.rgb = ORANGE
         c_shape.line.fill.background()
@@ -713,19 +725,17 @@ def generate_pptx(data, output_path):
         set_font(p_d_desc.runs[0], size=10, color=CHARCOAL)
 
     # ----------------------------------------------------
-    # SLIDE 5B: Similar Projects
+    # SLIDE 5B: Case Study
     # ----------------------------------------------------
-    slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Similar Projects", "Past credentials and successful delivery outcomes")
-    add_footer(slide)
-
     sim_projects = data.get("similar_projects", [])
     
     if sim_projects:
-        for i, proj in enumerate(sim_projects[:2]):
-            top = Inches(2.0 + (i * 2.2))
+        for proj in sim_projects:
+            slide = prs.slides.add_slide(blank_slide_layout)
+            create_slide_header(slide, "Case Study", "Past credentials and successful delivery outcomes")
+            add_footer(slide)
             
-            p_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.0), top, Inches(8.0), Inches(1.8))
+            p_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.0), Inches(2.0), Inches(8.0), Inches(4.0))
             p_box.fill.solid()
             p_box.fill.fore_color.rgb = OFF_WHITE
             p_box.line.color.rgb = GOLD
@@ -736,11 +746,11 @@ def generate_pptx(data, output_path):
             
             p_title = tf_p.paragraphs[0]
             p_title.text = f"{safe_text(proj.get('client_industry', 'Industry'))} | {safe_text(proj.get('project_name', 'Project'))}"
-            set_font(p_title.runs[0], size=14, bold=True, color=ORANGE)
+            set_font(p_title.runs[0], size=20, bold=True, color=ORANGE)
             
             p_outcome = tf_p.add_paragraph()
-            p_outcome.text = f"Outcome: {safe_text(proj.get('outcome', ''))}"
-            set_font(p_outcome.runs[0], size=12, color=CHARCOAL)
+            p_outcome.text = f"\nOutcome: {safe_text(proj.get('outcome', ''))}"
+            set_font(p_outcome.runs[0], size=16, color=CHARCOAL)
 
     # ----------------------------------------------------
     # SLIDE 6: Effort & Person-Hour Conversion
@@ -751,17 +761,17 @@ def generate_pptx(data, output_path):
 
     # Table layout
     resources = data.get("resources", [
-        {"role": "Engagement Partner", "loc": "Onsite", "fte": "0.25", "rate": "$30,000", "total": "$45,000", "person_days": 10},
-        {"role": "Lead Architect", "loc": "Onsite / Hybrid", "fte": "1.00", "rate": "$24,000", "total": "$144,000", "person_days": 60},
-        {"role": "Senior Frontend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
-        {"role": "Senior Backend Developer", "loc": "Offshore", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
-        {"role": "DevOps & Security Specialist", "loc": "Offshore", "fte": "1.00", "rate": "$9,000", "total": "$54,000", "person_days": 60}
+        {"role": "Engagement Partner", "fte": "0.25", "rate": "$30,000", "total": "$45,000", "person_days": 10},
+        {"role": "Lead Architect", "fte": "1.00", "rate": "$24,000", "total": "$144,000", "person_days": 60},
+        {"role": "Senior Frontend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
+        {"role": "Senior Backend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
+        {"role": "DevOps & Security Specialist", "fte": "1.00", "rate": "$9,000", "total": "$54,000", "person_days": 60}
     ])
     
-    rows = len(resources) + 1
+    rows = len(resources) + 2  # +1 for header, +1 for Total Assumption
     # Cap rows to fit on one slide
     rows = min(rows, 9)
-    cols = 6
+    cols = 5
     
     # Calculate a sensible height for the table depending on rows
     table_height = Inches(0.4 * rows)
@@ -769,14 +779,13 @@ def generate_pptx(data, output_path):
     table = table_shape.table
 
     # Column Widths
-    table.columns[0].width = Inches(2.0) # Role
-    table.columns[1].width = Inches(1.2) # Location
-    table.columns[2].width = Inches(1.2) # Count (FTE)
-    table.columns[3].width = Inches(1.5) # Monthly Rate
-    table.columns[4].width = Inches(1.3) # Person Days
-    table.columns[5].width = Inches(1.8) # Total Sizing
+    table.columns[0].width = Inches(3.0) # Role
+    table.columns[1].width = Inches(1.3) # Count (FTE)
+    table.columns[2].width = Inches(1.5) # Hourly Rate
+    table.columns[3].width = Inches(1.3) # Person Days
+    table.columns[4].width = Inches(1.9) # Total Sizing
 
-    headers = ["Role / Competency", "Delivery Location", "FTE Count", "Monthly Rate", "Person Days", "Total Financial Sizing"]
+    headers = ["Role / Competency", "FTE Count", "Hourly Rate", "Person Days", "Total Financial Sizing"]
     for j, header in enumerate(headers):
         cell = table.cell(0, j)
         cell.fill.solid()
@@ -786,9 +795,9 @@ def generate_pptx(data, output_path):
         p.alignment = PP_ALIGN.CENTER
         set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
-    for i, res in enumerate(resources[:rows-1]):
+    for i, res in enumerate(resources[:rows-2]):
         row_idx = i + 1
-        cols_val = [res.get("role"), res.get("loc"), res.get("fte"), res.get("rate"), str(res.get("person_days", "N/A")), res.get("total")]
+        cols_val = [res.get("role"), res.get("fte"), res.get("rate"), str(res.get("person_days", "N/A")), res.get("total")]
         for j, val in enumerate(cols_val):
             cell = table.cell(row_idx, j)
             cell.fill.solid()
@@ -797,6 +806,24 @@ def generate_pptx(data, output_path):
             p.text = safe_text(val)
             p.alignment = PP_ALIGN.CENTER if j > 0 else PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
+            
+    # Add Total Assumption Row
+    last_row_idx = rows - 1
+    for j in range(cols):
+        cell = table.cell(last_row_idx, j)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = ORANGE
+        p = cell.text_frame.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        if j == 0:
+            p.text = "Total Assumption"
+            p.alignment = PP_ALIGN.LEFT
+        elif j == 4:
+            p.text = str(safe_text(data.get("budget", "N/A")))
+        else:
+            p.text = " "
+        if p.runs:
+            set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
     # ----------------------------------------------------
     # SLIDE 7: Required Skills & PwC Competency Matching
@@ -806,28 +833,27 @@ def generate_pptx(data, output_path):
     add_footer(slide)
 
     skills_map = data.get("skills_mapping", [
-        {"skill": "React 18, TypeScript, Tailwind", "role": "Frontend Developer", "asset": "PwC Frontend Competency Center", "conf": "High (95%)"},
-        {"skill": "Flask API, Python Core", "role": "Backend Developer", "asset": "PwC Python/Data Competency Team", "conf": "High (90%)"},
-        {"skill": "MySQL Connector, RAG Store", "role": "Database Architect", "asset": "Enterprise Data Governance Framework", "conf": "Medium (85%)"},
-        {"skill": "python-pptx Engine", "role": "Orchestrator Agent", "asset": "PwC Proposal Creator Accelerator Asset", "conf": "High (95%)"},
-        {"skill": "CI/CD & DevOps", "role": "DevOps Engineer", "asset": "PwC DevOps Pipeline Accelerator", "conf": "High (98%)"}
+        {"skill": "React 18, TypeScript, Tailwind", "role": "Frontend Developer", "conf": "[✔]"},
+        {"skill": "Flask API, Python Core", "role": "Backend Developer", "conf": "[✔]"},
+        {"skill": "MySQL Connector, RAG Store", "role": "Database Architect", "conf": "[✔]"},
+        {"skill": "python-pptx Engine", "role": "Orchestrator Agent", "conf": "[✔]"},
+        {"skill": "CI/CD & DevOps", "role": "DevOps Engineer", "conf": "[✔]"}
     ])
     
     rows2 = len(skills_map) + 1
     # Cap rows to fit on one slide
     rows2 = min(rows2, 9)
-    cols2 = 4
+    cols2 = 3
     
     table_height2 = Inches(0.4 * rows2)
     table_shape2 = slide.shapes.add_table(rows2, cols2, Inches(0.5), Inches(1.5), Inches(9.0), table_height2)
     table2 = table_shape2.table
 
-    table2.columns[0].width = Inches(2.2) # Skill Name
-    table2.columns[1].width = Inches(2.0) # Target Role
-    table2.columns[2].width = Inches(3.5) # Associated PwC Asset/Team
-    table2.columns[3].width = Inches(1.3) # Fit Confidence
+    table2.columns[0].width = Inches(3.5) # Skill Name
+    table2.columns[1].width = Inches(3.5) # Target Role
+    table2.columns[2].width = Inches(2.0) # Fit Confidence
 
-    headers2 = ["Technical Skill", "Target Project Role", "Associated PwC Asset / Capability Team", "Fit Confidence"]
+    headers2 = ["Technical Skill", "Target Project Role", "Fit Check"]
     for j, header in enumerate(headers2):
         cell = table2.cell(0, j)
         cell.fill.solid()
@@ -839,14 +865,17 @@ def generate_pptx(data, output_path):
 
     for i, item in enumerate(skills_map[:rows2-1]):
         row_idx = i + 1
-        cols_val = [item.get("skill"), item.get("role"), item.get("asset"), item.get("conf")]
+        cols_val = [item.get("skill"), item.get("role"), item.get("conf", "[✔]")]
         for j, val in enumerate(cols_val):
             cell = table2.cell(row_idx, j)
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
             p = cell.text_frame.paragraphs[0]
-            p.text = safe_text(val)
-            p.alignment = PP_ALIGN.CENTER if j == 3 else PP_ALIGN.LEFT
+            if j == 2:
+                p.text = "[✔]"
+            else:
+                p.text = safe_text(val)
+            p.alignment = PP_ALIGN.CENTER if j == 2 else PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
     # ----------------------------------------------------
