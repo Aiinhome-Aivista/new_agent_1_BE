@@ -89,7 +89,7 @@ class ArangoDBClient:
 
             default_assets = [
                 {
-                    "name": "PwC Cloud Migration Toolkit",
+                    "name": "Enterprise Cloud Migration Toolkit",
                     "description": "A framework containing reusable Ansible and Terraform templates for migrating enterprise Java/React apps to AWS/Azure.",
                     "category": "Asset",
                     "capabilities": "AWS,Azure,Terraform,Ansible,Migration,Java,React"

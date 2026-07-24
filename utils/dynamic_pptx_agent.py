@@ -42,7 +42,7 @@ def create_title_slide() -> str:
     tf.word_wrap = True
     
     p_pre = tf.paragraphs[0]
-    p_pre.text = "PWC IT SOLUTION PROPOSAL"
+    p_pre.text = "IT SOLUTION PROPOSAL"
     set_font(p_pre.runs[0], size=14, bold=True, color=GOLD)
     
     p_main = tf.add_paragraph()

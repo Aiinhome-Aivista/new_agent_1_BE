@@ -16,6 +16,7 @@ def get_llm(temperature=0.2, json_mode=False):
     Returns a LangChain ChatOpenAI object configured to interact with the chosen Mistral LLM endpoint.
     If json_mode is True, response_format is set to JSON object.
     """
+    print(f"--- Using Mistral LLM in {MISTRAL_MODE.upper()} mode via LangChain ---")
     model_kwargs = {}
     if json_mode:
         model_kwargs["response_format"] = {"type": "json_object"}

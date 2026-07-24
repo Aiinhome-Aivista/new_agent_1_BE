@@ -393,7 +393,7 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         # ----------------------------------------------------
         # 2. KNOWLEDGE AGENT (LLM Requirement Extraction & RAG mapping)
         # ----------------------------------------------------
-        update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying PwC assets repository (RAG)...")
+        update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying internal assets repository (RAG)...")
         
         # Extract requirements using LangChain RequirementAgent
         requirements = req_agent.extract_requirements(full_document_text)
@@ -502,7 +502,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "'rate' (hourly rate string, e.g., '$50'), 'total' (total cost calculation for this resource as a string, e.g. '$10,000'), "
             "and 'person_days' (integer representing total estimated effort in days, e.g. 40).\n"
             "- 'skills_mapping': a list of exactly 5 skills mapping objects. Each object contains: "
-            "'skill' (technical skill name), 'role' (matching project role), 'asset' (matching PwC Asset/Competency name), "
+            "'skill' (technical skill name), 'role' (matching project role), 'asset' (matching Internal Asset/Competency name), "
             "and 'conf' (confidence percentage string, e.g. '95%').\n"
             f"CRITICAL: The sum of the 'total' cost for all resources MUST EXACTLY equal the target budget of {budget}. "
             f"Convert {project_duration} to months to calculate (rate * fte * months = total), but adjust the numbers so the sum matches the budget perfectly.\n"

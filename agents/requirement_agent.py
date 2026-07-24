@@ -172,7 +172,7 @@ class RequirementAgent:
 
     def run_rag_analysis(self, requirements: list, project_duration: str) -> dict:
         """
-        Maps requirements to PwC competencies/assets, does gap analysis, and returns matched/gaps lists.
+        Maps requirements to internal competencies/assets, does gap analysis, and returns matched/gaps lists.
         """
         matched_assets = []
         gaps = []
@@ -208,7 +208,7 @@ class RequirementAgent:
                 gaps.append(f"Identified gap in Client Requirement: '{req}'. Mitigation: {mitigation}")
 
         if not gaps:
-            gaps = ["No critical knowledge capability gaps identified. Full alignment with PwC competencies."]
+            gaps = ["No critical knowledge capability gaps identified. Full alignment with our competencies."]
 
         # Combine with LLM for final structure
         prompt = ChatPromptTemplate.from_messages([

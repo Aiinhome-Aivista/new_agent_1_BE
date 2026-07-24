@@ -55,7 +55,7 @@ INSERT IGNORE INTO users (id, username, password, role) VALUES (5, 'partner', 'p
 
 -- Seed some default competencies and assets
 INSERT IGNORE INTO knowledge_assets (name, description, category, capabilities) VALUES
-('PwC Cloud Migration Toolkit', 'A framework containing reusable Ansible and Terraform templates for migrating enterprise Java/React apps to AWS/Azure.', 'Asset', 'AWS,Azure,Terraform,Ansible,Migration,Java,React'),
+('Enterprise Cloud Migration Toolkit', 'A framework containing reusable Ansible and Terraform templates for migrating enterprise Java/React apps to AWS/Azure.', 'Asset', 'AWS,Azure,Terraform,Ansible,Migration,Java,React'),
 ('Enterprise Data Governance Framework', 'Standard templates, policies, and schemas for metadata management, lineage tracking, and data cataloging.', 'Asset', 'Governance,Collibra,Data Catalog,Metadata,SQL'),
 ('DevOps Pipeline Accelerator', 'Pre-configured CI/CD pipelines using GitHub Actions and GitLab CI, with integrated security scans (Snyk, SonarQube).', 'Asset', 'DevOps,GitHub Actions,GitLab CI,Snyk,SonarQube,Docker,Kubernetes'),
 ('React/TypeScript Front-End Competency', 'Large pool of skilled front-end engineers specializing in React, TypeScript, State Management (Zustand/Redux), and Tailwind CSS.', 'Competency', 'React,TypeScript,Zustand,Tailwind CSS,Vite'),

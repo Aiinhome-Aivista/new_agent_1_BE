@@ -15,6 +15,7 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
     """
     Sends a chat completion request to the chosen Mistral LLM endpoint.
     """
+    print(f"--- Using Mistral LLM in {MISTRAL_MODE.upper()} mode ---")
     headers = {
         "Content-Type": "application/json"
     }

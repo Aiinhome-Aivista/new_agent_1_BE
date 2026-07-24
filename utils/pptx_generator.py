@@ -2,7 +2,7 @@ import os
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
-from pptx.enum.text import PP_ALIGN
+from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
 
 def safe_text(val):
@@ -11,7 +11,7 @@ def safe_text(val):
     return str(val) if val is not None else ""
 
 
-# PwC Brand Colors
+# Brand Colors
 ORANGE = RGBColor(208, 74, 2)       # #D04A02
 CHARCOAL = RGBColor(45, 45, 45)     # #2D2D2D
 GOLD = RGBColor(235, 163, 0)        # #EBA300
@@ -65,7 +65,7 @@ def add_footer(slide):
 
     txBox = slide.shapes.add_textbox(Inches(0.5), Inches(7.1), Inches(9), Inches(0.3))
     p = txBox.text_frame.paragraphs[0]
-    p.text = "PwC Solution Advisory  |  Autonomous Bid Lifecycle Platform  |  AI Draft - For Internal Review Only"
+    p.text = "Solution Advisory  |  Autonomous Bid Lifecycle Platform  |  AI Draft - For Internal Review Only"
     p.alignment = PP_ALIGN.LEFT
     set_font(p.runs[0], size=8, bold=False, color=CHARCOAL)
 
@@ -376,7 +376,7 @@ def generate_pptx(data, output_path):
     tf.word_wrap = True
     
     p_pre = tf.paragraphs[0]
-    p_pre.text = "PWC IT SOLUTION PROPOSAL"
+    p_pre.text = "IT SOLUTION PROPOSAL"
     set_font(p_pre.runs[0], size=14, bold=True, color=GOLD)
     
     p_main = tf.add_paragraph()
@@ -553,11 +553,17 @@ def generate_pptx(data, output_path):
             box.line.width = Pt(1.5)
             
             # Text inside box
-            tb = slide.shapes.add_textbox(Inches(0.6), Inches(current_top + (box_h / 2) - 0.2), Inches(8.8), Inches(0.4))
-            p = tb.text_frame.paragraphs[0]
+            tb = slide.shapes.add_textbox(Inches(0.6), Inches(current_top), Inches(8.8), Inches(box_h))
+            tf = tb.text_frame
+            tf.word_wrap = True
+            try:
+                tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+            except:
+                pass
+            p = tf.paragraphs[0]
             p.text = safe_text(item_text)
             p.alignment = PP_ALIGN.CENTER
-            set_font(p.runs[0], size=12, bold=True, color=WHITE)
+            set_font(p.runs[0], size=11, bold=True, color=WHITE)
             
             current_top += box_h
             
@@ -624,16 +630,31 @@ def generate_pptx(data, output_path):
                 c_box.line.color.rgb = ORANGE
                 c_box.line.width = Pt(1)
                 
-                p_comp = c_box.text_frame.paragraphs[0]
+                tf_comp = c_box.text_frame
+                tf_comp.word_wrap = True
+                try:
+                    tf_comp.vertical_anchor = MSO_ANCHOR.MIDDLE
+                except:
+                    pass
+                p_comp = tf_comp.paragraphs[0]
                 p_comp.text = safe_text(comp)
                 p_comp.alignment = PP_ALIGN.CENTER
-                set_font(p_comp.runs[0], size=10, bold=True, color=CHARCOAL)
+                set_font(p_comp.runs[0], size=7.5, bold=True, color=CHARCOAL)
+                
+                # Add horizontal arrow to next component to show sequence
+                if j < len(comps) - 1:
+                    arr_x = c_left + c_width - Inches(0.15)
+                    arr_y = top + Inches(0.4)
+                    c_arr = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, arr_x, arr_y, Inches(0.15), Inches(0.2))
+                    c_arr.fill.solid()
+                    c_arr.fill.fore_color.rgb = ORANGE
+                    c_arr.line.fill.background()
 
     # ----------------------------------------------------
     # SLIDE 4B: Azure Cost Calculator (Estimations)
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Azure Cost Calculator (Estimations)", "Estimated cloud infrastructure components and costs")
+    create_slide_header(slide, "Infrastructure Approximation", "Estimated cloud infrastructure components and costs")
     add_footer(slide)
 
     infra_items = data.get("infrastructure_approximation", [])
@@ -678,15 +699,23 @@ def generate_pptx(data, output_path):
     add_footer(slide)
 
     phases = data.get("timeline_phases", [
-        {"phase": "Phase 1: Discovery & Setup", "duration": "Weeks 1-3", "deliverables": "RFP requirements analysis"},
-        {"phase": "Phase 2: Development", "duration": "Weeks 4-8", "deliverables": "Core engineering & integration"},
-        {"phase": "Phase 3: Testing", "duration": "Weeks 9-11", "deliverables": "QA and Integration Testing"},
-        {"phase": "Phase 4: Deployment", "duration": "Weeks 12-13", "deliverables": "Production release"},
-        {"phase": "Phase 5: Training", "duration": "Week 14", "deliverables": "User training & handover"}
+        {"phase": "Design & Planning", "deliverables": "RFP requirements analysis"},
+        {"phase": "Development", "deliverables": "Core engineering & integration"},
+        {"phase": "Testing", "deliverables": "QA and Integration Testing"},
+        {"phase": "Deployment", "deliverables": "Production release"},
+        {"phase": "Training", "deliverables": "User training & handover"}
     ])
+
+    enforced_names = ["Design & Planning", "Development", "Testing", "Deployment", "Training"]
 
     for i, phase in enumerate(phases[:5]):
         top = Inches(1.5 + (i * 1.1))
+        
+        # Enforce exact phase name
+        if i < len(enforced_names):
+            phase_name = enforced_names[i]
+        else:
+            phase_name = safe_text(phase.get("phase", ""))
         
         # Chevron Phase Box
         c_shape = slide.shapes.add_shape(MSO_SHAPE.CHEVRON, Inches(0.5), top, Inches(3.2), Inches(0.9))
@@ -698,14 +727,9 @@ def generate_pptx(data, output_path):
         tf_c = c_shape.text_frame
         tf_c.word_wrap = True
         p_c = tf_c.paragraphs[0]
-        p_c.text = safe_text(phase.get("phase", ""))
+        p_c.text = phase_name
         p_c.alignment = PP_ALIGN.CENTER
         set_font(p_c.runs[0], size=11, bold=True, color=WHITE)
-        
-        p_dur = tf_c.add_paragraph()
-        p_dur.text = f"({safe_text(phase.get('duration', ''))})"
-        p_dur.alignment = PP_ALIGN.CENTER
-        set_font(p_dur.runs[0], size=10, color=GOLD)
 
         # Description / Deliverables Box next to the Chevron
         d_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(4.0), top, Inches(5.5), Inches(1.3))
@@ -809,6 +833,16 @@ def generate_pptx(data, output_path):
             
     # Add Total Assumption Row
     last_row_idx = rows - 1
+    
+    total_hourly_rate = 0
+    for res in resources[:rows-2]:
+        rate_str = res.get("rate", "0")
+        try:
+            rate_val = float(str(rate_str).replace('$', '').replace(',', '').strip())
+            total_hourly_rate += rate_val
+        except:
+            pass
+
     for j in range(cols):
         cell = table.cell(last_row_idx, j)
         cell.fill.solid()
@@ -818,6 +852,8 @@ def generate_pptx(data, output_path):
         if j == 0:
             p.text = "Total Assumption"
             p.alignment = PP_ALIGN.LEFT
+        elif j == 2:
+            p.text = f"${int(total_hourly_rate):,}"
         elif j == 4:
             p.text = str(safe_text(data.get("budget", "N/A")))
         else:
@@ -826,10 +862,10 @@ def generate_pptx(data, output_path):
             set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
     # ----------------------------------------------------
-    # SLIDE 7: Required Skills & PwC Competency Matching
+    # SLIDE 7: Required Skills & Competency Matching
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Skills Inventory & PwC Competency Mapping", "Required technical capabilities grounded in organizational assets")
+    create_slide_header(slide, "Skills Inventory & Competency Mapping", "Required technical capabilities grounded in organizational assets")
     add_footer(slide)
 
     skills_map = data.get("skills_mapping", [
@@ -843,17 +879,16 @@ def generate_pptx(data, output_path):
     rows2 = len(skills_map) + 1
     # Cap rows to fit on one slide
     rows2 = min(rows2, 9)
-    cols2 = 3
+    cols2 = 2
     
     table_height2 = Inches(0.4 * rows2)
     table_shape2 = slide.shapes.add_table(rows2, cols2, Inches(0.5), Inches(1.5), Inches(9.0), table_height2)
     table2 = table_shape2.table
 
-    table2.columns[0].width = Inches(3.5) # Skill Name
-    table2.columns[1].width = Inches(3.5) # Target Role
-    table2.columns[2].width = Inches(2.0) # Fit Confidence
+    table2.columns[0].width = Inches(4.5) # Skill Name
+    table2.columns[1].width = Inches(4.5) # Target Role
 
-    headers2 = ["Technical Skill", "Target Project Role", "Fit Check"]
+    headers2 = ["Technical Skill", "Target Project Role"]
     for j, header in enumerate(headers2):
         cell = table2.cell(0, j)
         cell.fill.solid()
@@ -865,17 +900,14 @@ def generate_pptx(data, output_path):
 
     for i, item in enumerate(skills_map[:rows2-1]):
         row_idx = i + 1
-        cols_val = [item.get("skill"), item.get("role"), item.get("conf", "[✔]")]
+        cols_val = [item.get("skill"), item.get("role")]
         for j, val in enumerate(cols_val):
             cell = table2.cell(row_idx, j)
             cell.fill.solid()
             cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
             p = cell.text_frame.paragraphs[0]
-            if j == 2:
-                p.text = "[✔]"
-            else:
-                p.text = safe_text(val)
-            p.alignment = PP_ALIGN.CENTER if j == 2 else PP_ALIGN.LEFT
+            p.text = safe_text(val)
+            p.alignment = PP_ALIGN.LEFT
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
     # ----------------------------------------------------

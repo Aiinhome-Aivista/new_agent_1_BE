@@ -61,7 +61,7 @@ def get_embedding(text):
     }
     
     try:
-        res = requests.post(url_ollama, json=payload_ollama, headers=headers, timeout=10)
+        res = requests.post(url_ollama, json=payload_ollama, headers=headers, timeout=60)
         if res.status_code == 200:
             data = res.json()
             embedding = data.get("embedding")
@@ -77,7 +77,7 @@ def get_embedding(text):
     }
     
     try:
-        res = requests.post(url_openai, json=payload_openai, headers=headers, timeout=5)
+        res = requests.post(url_openai, json=payload_openai, headers=headers, timeout=60)
         if res.status_code == 200:
             data = res.json()
             embedding = data.get("data", [{}])[0].get("embedding")
