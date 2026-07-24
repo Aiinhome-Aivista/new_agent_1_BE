@@ -445,11 +445,11 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             f"You are a Delivery Manager sizing project delivery. The client's target budget is {budget} "
             f"and duration is {project_duration}. Generate resource and timeline estimation.\n"
             "Respond ONLY as a JSON object with the following keys:\n"
-            "- 'timeline_phases': a list of exactly 3 phase objects. Each phase object contains 'phase' (name), "
+            "- 'timeline_phases': a list of exactly 5 phase objects (e.g. Discovery, Development, Testing, Deployment, Training). Each phase object contains 'phase' (name), "
             "'duration' (weeks range), and 'deliverables' (key activities/deliverables text).\n"
             "- 'resources': a list of exactly 5 resource roles. Each resource object contains: "
-            "'role' (string), 'loc' ('Onsite', 'Offshore', 'Hybrid'), 'fte' (decimal string, e.g., '1.00', '0.25'), "
-            "'rate' (monthly rate string, e.g., '$8,000'), 'total' (total cost calculation for this resource as a string, e.g. '$10,000'), "
+            "'role' (string), 'fte' (decimal string, e.g., '1.00', '0.25'), "
+            "'rate' (hourly rate string, e.g., '$50'), 'total' (total cost calculation for this resource as a string, e.g. '$10,000'), "
             "and 'person_days' (integer representing total estimated effort in days, e.g. 40).\n"
             "- 'skills_mapping': a list of exactly 5 skills mapping objects. Each object contains: "
             "'skill' (technical skill name), 'role' (matching project role), 'asset' (matching PwC Asset/Competency name), "
@@ -465,16 +465,18 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             raise RuntimeError("Failed to connect to local Mistral LLM server for Planning and Sizing.")
         
         default_timeline = [
-            {"phase": "Phase 1: Discovery & Setup", "duration": "Weeks 1-3", "deliverables": "RFP requirements analysis, database sync, initial architectures alignment."},
-            {"phase": "Phase 2: Core Platform Build", "duration": "Weeks 4-10", "deliverables": "Flask backend setup, multi-agent logic integration, React dashboard interfaces, and PPTX renderer."},
-            {"phase": "Phase 3: UAT & Handoff", "duration": "Weeks 11-14", "deliverables": "UAT feedback validation, performance tuning, and staging platform release."}
+            {"phase": "Phase 1: Discovery & Setup", "duration": "Weeks 1-3", "deliverables": "RFP requirements analysis"},
+            {"phase": "Phase 2: Development", "duration": "Weeks 4-8", "deliverables": "Core engineering & integration"},
+            {"phase": "Phase 3: Testing", "duration": "Weeks 9-11", "deliverables": "QA and Integration Testing"},
+            {"phase": "Phase 4: Deployment", "duration": "Weeks 12-13", "deliverables": "Production release"},
+            {"phase": "Phase 5: Training", "duration": "Week 14", "deliverables": "User training & handover"}
         ]
         default_resources = [
-            {"role": "Engagement Director", "loc": "Hybrid", "fte": "0.15", "rate": "$32,000", "total": "$21,600", "person_days": 10},
-            {"role": "Lead Architect", "loc": "Onsite", "fte": "1.00", "rate": "$25,000", "total": "$100,000", "person_days": 60},
-            {"role": "Senior Developer (Front-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000", "person_days": 90},
-            {"role": "Senior Developer (Back-end)", "loc": "Offshore", "fte": "1.50", "rate": "$8,000", "total": "$48,000", "person_days": 90},
-            {"role": "QA & Test Engineer", "loc": "Offshore", "fte": "1.00", "rate": "$6,000", "total": "$24,000", "person_days": 60}
+            {"role": "Engagement Director", "fte": "0.15", "rate": "$100", "total": "$21,600", "person_days": 10},
+            {"role": "Lead Architect", "fte": "1.00", "rate": "$80", "total": "$100,000", "person_days": 60},
+            {"role": "Senior Developer (Front-end)", "fte": "1.50", "rate": "$50", "total": "$48,000", "person_days": 90},
+            {"role": "Senior Developer (Back-end)", "fte": "1.50", "rate": "$50", "total": "$48,000", "person_days": 90},
+            {"role": "QA & Test Engineer", "fte": "1.00", "rate": "$40", "total": "$24,000", "person_days": 60}
         ]
         default_skills = [
             {"skill": "React 18 & TypeScript", "role": "Senior Developer (Front-end)", "asset": "React/TypeScript Front-End Competency", "conf": "High (95%)"},
