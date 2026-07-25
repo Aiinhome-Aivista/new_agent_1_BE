@@ -11,6 +11,230 @@ def safe_text(val):
     return str(val) if val is not None else ""
 
 
+import re
+
+
+def replace_tech_labels_with_icons(mermaid_code):
+    tech_icons = {
+        "react": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/react/react-original.svg",
+        "angular": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/angularjs/angularjs-original.svg",
+        "vue": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/vuejs/vuejs-original.svg",
+        "flask": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/flask/flask-original.svg",
+        "django": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/django/django-plain.svg",
+        "express": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/express/express-original.svg",
+        "nestjs": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/nestjs/nestjs-plain.svg",
+        "spring": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/spring/spring-original.svg",
+        "go /": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg",
+        "golang": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/go/go-original.svg",
+        "mysql": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mysql/mysql-original.svg",
+        "postgresql": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg",
+        "postgres": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/postgresql/postgresql-original.svg",
+        "mongodb": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/mongodb/mongodb-original.svg",
+        "arangodb": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/arangodb.svg",
+        "sqlite": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/sqlite/sqlite-original.svg",
+        "redis": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/redis/redis-original.svg",
+        "azure": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/azure/azure-original.svg",
+        "aws": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/amazonaws.svg",
+        "google cloud": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/googlecloud.svg",
+        "salesforce": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/salesforce.svg",
+        "sap": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/sap.svg",
+        "tableau": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/tableau.svg",
+        "power bi": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/powerbi.svg",
+        "powerbi": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/powerbi.svg",
+        "github": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/github.svg",
+        "devops": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/azuredevops.svg",
+        "terraform": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/terraform.svg",
+        "stripe": "https://cdn.jsdelivr.net/npm/simple-icons@v9/icons/stripe.svg",
+        "docker": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/docker/docker-original.svg",
+        "kubernetes": "https://cdn.jsdelivr.net/gh/devicons/devicon/icons/kubernetes/kubernetes-plain.svg"
+    }
+
+    pattern = r'(\b[a-zA-Z0-9_-]+\b\s*(?:\[\("?|\["?|\("?|\{"?))([^"\]\)\}]+)("?(?:\)\)|\]\)|\}\}|\]|\)))'
+    
+    def replacer(match):
+        prefix = match.group(1)
+        text = match.group(2)
+        suffix = match.group(3)
+        
+        if "<img" in text:
+            return match.group(0)
+            
+        text_lower = text.lower()
+        for tech, url in tech_icons.items():
+            if tech in text_lower:
+                clean_text = text.replace("'", "\\'")
+                img_tag = f"<img src='{url}' width='28' height='28'/> "
+                has_quotes = prefix.endswith('"') or suffix.startswith('"')
+                if not has_quotes:
+                    new_prefix = prefix + '"'
+                    new_suffix = '"' + suffix
+                    return f"{new_prefix}{img_tag}{clean_text}{new_suffix}"
+                else:
+                    return f"{prefix}{img_tag}{clean_text}{suffix}"
+                    
+        return match.group(0)
+        
+    return re.sub(pattern, replacer, mermaid_code)
+
+
+def crop_whitespace(image_path):
+    from PIL import Image, ImageChops
+    try:
+        with Image.open(image_path) as img:
+            # Convert to RGBA
+            img_rgba = img.convert('RGBA')
+            
+            # Extract alpha channel
+            alpha = img_rgba.split()[3]
+            bbox_alpha = alpha.getbbox()
+            
+            # Check difference against pure white background
+            bg = Image.new('RGBA', img_rgba.size, (255, 255, 255, 255))
+            diff = ImageChops.difference(img_rgba, bg)
+            bbox_diff = diff.getbbox()
+            
+            # Select the most appropriate bounding box
+            bbox = None
+            if bbox_alpha:
+                # If there are transparent areas, getextrema returns min < 255
+                extrema = alpha.getextrema()
+                if extrema[0] < 255:
+                    bbox = bbox_alpha
+            
+            if not bbox:
+                bbox = bbox_diff
+                
+            if bbox:
+                # Add 10px margin to avoid tight clipping of borders
+                left, top, right, bottom = bbox
+                left = max(0, left - 10)
+                top = max(0, top - 10)
+                right = min(img_rgba.width, right + 10)
+                bottom = min(img_rgba.height, bottom + 10)
+                
+                cropped = img_rgba.crop((left, top, right, bottom))
+                cropped.save(image_path)
+    except Exception as e:
+        print(f"Error cropping image whitespace: {e}")
+
+
+def render_mermaid_to_image(mermaid_code):
+    import base64
+    import requests
+    import tempfile
+    
+    if not mermaid_code or not isinstance(mermaid_code, str):
+        return None
+        
+    mermaid_code = mermaid_code.strip()
+    
+    if mermaid_code.startswith("```mermaid"):
+        mermaid_code = mermaid_code[10:]
+    elif mermaid_code.startswith("```"):
+        mermaid_code = mermaid_code[3:]
+    if mermaid_code.endswith("```"):
+        mermaid_code = mermaid_code[:-3]
+    mermaid_code = mermaid_code.strip()
+
+    # Automatically transform text labels to embed official technology icons
+    try:
+        mermaid_code = replace_tech_labels_with_icons(mermaid_code)
+    except Exception as e:
+        print(f"Failed to replace tech labels with brand icons: {e}")
+    
+    if mermaid_code.startswith("```mermaid"):
+        mermaid_code = mermaid_code[10:]
+    elif mermaid_code.startswith("```"):
+        mermaid_code = mermaid_code[3:]
+    if mermaid_code.endswith("```"):
+        mermaid_code = mermaid_code[:-3]
+    mermaid_code = mermaid_code.strip()
+    
+    # Strip any custom inline style/class declarations to enforce corporate base theme
+    lines = mermaid_code.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        stripped = line.strip()
+        if (stripped.startswith("style ") or 
+            stripped.startswith("classDef ") or 
+            stripped.startswith("class ") or 
+            stripped.startswith("linkStyle ")):
+            continue
+        cleaned_lines.append(line)
+    mermaid_code = "\n".join(cleaned_lines)
+    
+    if "%%{init:" not in mermaid_code:
+        style_init = (
+            "%%{init: {\n"
+            "    'theme': 'base',\n"
+            "    'themeVariables': {\n"
+            "        'primaryColor': '#ffffff',\n"
+            "        'primaryTextColor': '#2d2d2d',\n"
+            "        'primaryBorderColor': '#d04a02',\n"
+            "        'lineColor': '#4a4a4a',\n"
+            "        'secondaryColor': '#f4f6f8',\n"
+            "        'tertiaryColor': '#ffffff',\n"
+            "        'mainBkg': '#ffffff',\n"
+            "        'nodeBorder': '#d04a02',\n"
+            "        'clusterBkg': '#f8f9fa',\n"
+            "        'clusterBorder': '#cccccc',\n"
+            "        'fontSize': '18px',\n"
+            "        'subgraphFontSize': '20px',\n"
+            "        'labelFontSize': '15px'\n"
+            "    }\n"
+            "}}%%\n"
+        )
+        mermaid_code = style_init + mermaid_code
+        
+    try:
+        diagram_bytes = mermaid_code.encode('utf-8')
+        urlsafe_base64_bytes = base64.urlsafe_b64encode(diagram_bytes)
+        urlsafe_base64_string = urlsafe_base64_bytes.decode('utf-8').replace('=', '')
+        
+        url = f"https://mermaid.ink/img/{urlsafe_base64_string}"
+        response = requests.get(url, timeout=15)
+        if response.status_code == 200:
+            temp_dir = tempfile.gettempdir()
+            temp_path = os.path.join(temp_dir, f"mermaid_{os.urandom(8).hex()}.png")
+            with open(temp_path, "wb") as f:
+                f.write(response.content)
+            
+            # Auto-crop white/transparent margins around diagram elements
+            crop_whitespace(temp_path)
+            
+            return temp_path
+        else:
+            print(f"Mermaid rendering API returned status: {response.status_code}")
+    except Exception as e:
+        print(f"Error rendering mermaid diagram: {e}")
+    return None
+
+
+def add_picture_proportionally(slide, image_path, left_limit, top_limit, max_w, max_h):
+    from PIL import Image
+    try:
+        with Image.open(image_path) as img:
+            img_w, img_h = img.size
+        img_ratio = img_w / img_h
+        box_ratio = max_w / max_h
+        
+        if img_ratio > box_ratio:
+            fit_w = max_w
+            fit_h = max_w / img_ratio
+        else:
+            fit_h = max_h
+            fit_w = max_h * img_ratio
+            
+        center_x = left_limit + (max_w - fit_w) / 2
+        center_y = top_limit + (max_h - fit_h) / 2
+        
+        slide.shapes.add_picture(image_path, center_x, center_y, fit_w, fit_h)
+    except Exception as e:
+        print(f"Failed to add picture proportionally: {e}")
+        slide.shapes.add_picture(image_path, left_limit, top_limit, max_w, max_h)
+
+
+
 # Brand Colors
 ORANGE = RGBColor(208, 74, 2)       # #D04A02
 CHARCOAL = RGBColor(45, 45, 45)     # #2D2D2D
@@ -38,21 +262,31 @@ def create_slide_header(slide, title_text, subtitle_text=None):
     header_box.line.width = Pt(1.5)
 
     # Add title text
-    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(0.1), Inches(9), Inches(0.7))
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(0.05), Inches(9), Inches(0.8))
     tf = txBox.text_frame
     tf.word_wrap = True
+    tf.margin_top = Inches(0.02)
+    tf.margin_bottom = Inches(0.02)
     p = tf.paragraphs[0]
     p.text = title_text
     p.alignment = PP_ALIGN.LEFT
     run = p.runs[0]
-    set_font(run, size=24, bold=True, color=WHITE)
+    
+    # Scale font size based on length
+    title_size = 24
+    if len(title_text) > 70:
+        title_size = 14
+    elif len(title_text) > 50:
+        title_size = 18
+        
+    set_font(run, size=title_size, bold=True, color=WHITE)
 
     # Add subtitle
     if subtitle_text:
         p2 = tf.add_paragraph()
         p2.text = subtitle_text
         run2 = p2.runs[0]
-        set_font(run2, size=11, color=GOLD)
+        set_font(run2, size=9, color=GOLD)
 
 def add_footer(slide):
     # Footnote bar
@@ -70,7 +304,7 @@ def add_footer(slide):
     set_font(p.runs[0], size=8, bold=False, color=CHARCOAL)
 
 
-def add_reference_architecture_slide(slide, prs):
+def add_reference_architecture_slide(slide, prs, data):
     # Background
     bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
     bg.fill.solid()
@@ -80,270 +314,183 @@ def add_reference_architecture_slide(slide, prs):
     create_slide_header(slide, "Reference Architecture", "Enterprise logical data patterns")
     add_footer(slide)
 
-    # Cloud Box (Light Green)
-    cloud_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.2), Inches(1.3), Inches(4.5), Inches(3.4))
-    cloud_box.fill.solid()
-    cloud_box.fill.fore_color.rgb = RGBColor(238, 247, 233)
-    cloud_box.line.color.rgb = RGBColor(200, 220, 190)
-    p = cloud_box.text_frame.paragraphs[0]
-    p.text = "CLOUD"
-    p.alignment = PP_ALIGN.LEFT
-    set_font(p.runs[0], size=8, bold=True)
-    
-    # ON-PREM Box (Light Grey)
-    onprem_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.2), Inches(4.8), Inches(4.5), Inches(2.0))
-    onprem_box.fill.solid()
-    onprem_box.fill.fore_color.rgb = RGBColor(245, 245, 245)
-    onprem_box.line.color.rgb = GREY
-    p = onprem_box.text_frame.paragraphs[0]
-    p.text = "ON-PREM (Optional)"
-    p.alignment = PP_ALIGN.LEFT
-    set_font(p.runs[0], size=8, bold=True)
-    
-    # External Data Sources
-    tx = slide.shapes.add_textbox(Inches(0.2), Inches(1.3), Inches(1.5), Inches(0.4))
-    p = tx.text_frame.paragraphs[0]
-    p.text = "External Data\nSources"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=10, bold=True)
-    
-    # Internal Data Sources
-    tx2 = slide.shapes.add_textbox(Inches(0.2), Inches(4.8), Inches(1.5), Inches(0.4))
-    p2 = tx2.text_frame.paragraphs[0]
-    p2.text = "Internal Data\nSources"
-    p2.alignment = PP_ALIGN.CENTER
-    set_font(p2.runs[0], size=10, bold=True)
+    cloud_name = "Azure"
+    if data and ("aws" in str(data).lower() or "amazon" in str(data).lower()):
+        cloud_name = "AWS"
+    elif data and ("gcp" in str(data).lower() or "google" in str(data).lower()):
+        cloud_name = "Google Cloud"
 
-    # Some Data source DBs
-    ds1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.6), Inches(2.0), Inches(0.7), Inches(0.8))
-    ds1.fill.solid()
-    ds1.fill.fore_color.rgb = WHITE
-    ds1.line.color.rgb = CHARCOAL
-    
-    # Raw Data Zone
-    raw_zone = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.5), Inches(1.6), Inches(1.3), Inches(1.7))
-    raw_zone.fill.solid()
-    raw_zone.fill.fore_color.rgb = WHITE
-    raw_zone.line.color.rgb = GREY
-    
-    tx_raw = slide.shapes.add_textbox(Inches(2.5), Inches(1.6), Inches(1.3), Inches(0.3))
-    p = tx_raw.text_frame.paragraphs[0]
-    p.text = "RAW DATA ZONE"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=8, bold=True)
-    
-    tx_raw_os = slide.shapes.add_textbox(Inches(2.5), Inches(2.9), Inches(1.3), Inches(0.3))
-    p = tx_raw_os.text_frame.paragraphs[0]
-    p.text = "Object Storage"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=8, bold=False)
+    storage_name = "Azure Blob Storage"
+    if cloud_name == "AWS":
+        storage_name = "AWS S3"
+    elif cloud_name == "Google Cloud":
+        storage_name = "Google Cloud Storage"
 
-    # Database in Raw Data Zone
-    raw_db = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(2.8), Inches(2.0), Inches(0.7), Inches(0.8))
-    raw_db.fill.solid()
-    raw_db.fill.fore_color.rgb = WHITE
-    raw_db.line.color.rgb = ORANGE
-    p = raw_db.text_frame.paragraphs[0]
-    p.text = "Raw DB"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=7, bold=True)
+    mermaid_code = (
+        "graph LR\n"
+        "    subgraph External [External Sources]\n"
+        "        E1[RFI/RFP Documents]\n"
+        "        E2[Project Timeline]\n"
+        "        E3[Competency Documents]\n"
+        "        E4[Company Asset Lists]\n"
+        "        E5[Questionnaires]\n"
+        "        E6[Financial Documents]\n"
+        "        PA[Parsing Agent]\n"
+        "    end\n"
+        "    \n"
+        "    subgraph Orchestration [Orchestration Layer]\n"
+        "        HO[Hierarchical Orchestrator]\n"
+        "        RMA[Requirement Mapping Agent]\n"
+        "        SDA[Solution Design Agent]\n"
+        "        PLA[Planning Agent]\n"
+        "        RA[Rendering Agent]\n"
+        "    end\n"
+        "    \n"
+        "    subgraph Knowledge [Knowledge Layer]\n"
+        "        KB[PostgreSQL: Competencies]\n"
+        "        VS[ChromaDB: Vector Store]\n"
+        "    end\n"
+        "    \n"
+        "    subgraph Guardrails [Guardrails]\n"
+        "        VAL[Guardrails SDK: Validation]\n"
+        "        CC[Compliance Check]\n"
+        "    end\n"
+        "    \n"
+        "    subgraph Output [Output Layer]\n"
+        "        PRE[PowerPoint Rendering Engine]\n"
+        f"        ABS[{storage_name}: Draft Proposals]\n"
+        "        HRI[Human Review Interface]\n"
+        "        AP[Approved Proposal]\n"
+        "    end\n"
+        "    \n"
+        "    E1 --> PA\n"
+        "    E2 --> PA\n"
+        "    E3 --> PA\n"
+        "    E4 --> PA\n"
+        "    E5 --> PA\n"
+        "    E6 --> PA\n"
+        "    PA --> HO\n"
+        "    \n"
+        "    HO --> RMA\n"
+        "    HO --> SDA\n"
+        "    HO --> PLA\n"
+        "    HO --> RA\n"
+        "    \n"
+        "    RMA --> KB\n"
+        "    SDA --> KB\n"
+        "    SDA --> VS\n"
+        "    PLA --> KB\n"
+        "    PLA --> VS\n"
+        "    RA --> VS\n"
+        "    \n"
+        "    KB --> VAL\n"
+        "    VS --> VAL\n"
+        "    VAL --> CC\n"
+        "    \n"
+        "    HO --> CC\n"
+        "    HO --> PRE\n"
+        "    PRE --> ABS\n"
+        "    ABS --> HRI\n"
+        "    HRI --> AP\n"
+        "    CC --> HRI\n"
+    )
 
-    # Curated Zone
-    cur_zone = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(4.0), Inches(1.6), Inches(1.3), Inches(1.7))
-    cur_zone.fill.solid()
-    cur_zone.fill.fore_color.rgb = WHITE
-    cur_zone.line.color.rgb = GREY
-    
-    tx_cur = slide.shapes.add_textbox(Inches(4.0), Inches(1.6), Inches(1.3), Inches(0.3))
-    p = tx_cur.text_frame.paragraphs[0]
-    p.text = "CURATED ZONE"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=8, bold=True)
-    
-    tx_cur_os = slide.shapes.add_textbox(Inches(4.0), Inches(2.9), Inches(1.3), Inches(0.3))
-    p = tx_cur_os.text_frame.paragraphs[0]
-    p.text = "Object Storage"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=8, bold=False)
-
-    cur_db = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(4.3), Inches(2.0), Inches(0.7), Inches(0.8))
-    cur_db.fill.solid()
-    cur_db.fill.fore_color.rgb = WHITE
-    cur_db.line.color.rgb = ORANGE
-    p = cur_db.text_frame.paragraphs[0]
-    p.text = "Curated DB"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=7, bold=True)
-
-    # Datamarts
-    dm_zone = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(5.6), Inches(1.6), Inches(0.9), Inches(2.9))
-    dm_zone.fill.solid()
-    dm_zone.fill.fore_color.rgb = RGBColor(250, 250, 250)
-    dm_zone.line.color.rgb = GREY
-    
-    tx_dm = slide.shapes.add_textbox(Inches(5.6), Inches(1.6), Inches(0.9), Inches(0.3))
-    p = tx_dm.text_frame.paragraphs[0]
-    p.text = "DATAMARTS"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=8, bold=True)
-    
-    dm1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.8), Inches(2.0), Inches(0.5), Inches(0.6))
-    dm1.fill.solid(); dm1.fill.fore_color.rgb = WHITE; dm1.line.color.rgb = CHARCOAL
-    dm2 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.8), Inches(2.8), Inches(0.5), Inches(0.6))
-    dm2.fill.solid(); dm2.fill.fore_color.rgb = WHITE; dm2.line.color.rgb = CHARCOAL
-    dm3 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.8), Inches(3.6), Inches(0.5), Inches(0.6))
-    dm3.fill.solid(); dm3.fill.fore_color.rgb = WHITE; dm3.line.color.rgb = CHARCOAL
-
-    # Data flow lines (Arrows)
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.4), Inches(2.4), Inches(1.0), Inches(0.15))
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.4), Inches(5.0), Inches(1.0), Inches(0.15))
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(3.8), Inches(2.4), Inches(0.2), Inches(0.15))
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(5.3), Inches(2.4), Inches(0.3), Inches(0.15))
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(6.5), Inches(2.4), Inches(0.5), Inches(0.15))
-
-    # Use Cases
-    tx3 = slide.shapes.add_textbox(Inches(7.3), Inches(1.3), Inches(2.0), Inches(0.4))
-    p3 = tx3.text_frame.paragraphs[0]
-    p3.text = "Use Cases"
-    p3.alignment = PP_ALIGN.CENTER
-    set_font(p3.runs[0], size=10, bold=True)
-
-    use_cases = ["Cloud API", "Data & service exchange", "Advanced Analytics", "IoT Apps", "Business Intelligence", "3rd Party Apps"]
-    for i, uc in enumerate(use_cases):
-        r = i // 2
-        c = i % 2
-        uc_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(7.0 + c*1.3), Inches(1.8 + r*0.8), Inches(1.2), Inches(0.6))
-        uc_box.fill.solid()
-        uc_box.fill.fore_color.rgb = RGBColor(245, 250, 245)
-        uc_box.line.color.rgb = GREY
-        p = uc_box.text_frame.paragraphs[0]
-        p.text = uc
-        p.alignment = PP_ALIGN.CENTER
-        set_font(p.runs[0], size=8)
+    temp_img_path = render_mermaid_to_image(mermaid_code)
+    if temp_img_path and os.path.exists(temp_img_path):
+        try:
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.0), Inches(9.6), Inches(6.0))
+        except Exception as e:
+            print(f"Failed to add mermaid image to Reference Architecture slide: {e}")
+        finally:
+            try:
+                os.remove(temp_img_path)
+            except:
+                pass
 
 
-def add_azure_landscape_architecture_slide(slide, prs):
+def add_azure_landscape_architecture_slide(slide, prs, data):
     bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
     bg.fill.solid()
     bg.fill.fore_color.rgb = WHITE
     bg.line.fill.background()
 
-    create_slide_header(slide, "Landscape Architecture (Azure Cloud Platform)", "Azure Native Services & Integration Topology")
+    cloud_name = "Azure"
+    if data and ("aws" in str(data).lower() or "amazon" in str(data).lower()):
+        cloud_name = "AWS"
+    elif data and ("gcp" in str(data).lower() or "google" in str(data).lower()):
+        cloud_name = "Google Cloud"
+
+    create_slide_header(slide, f"Landscape Architecture ({cloud_name} Cloud Platform)", f"{cloud_name} Native Services & Integration Topology")
     add_footer(slide)
-    
-    azure_blue = RGBColor(0, 114, 198)
-
-    # Left: SAP HANA, SAP Ariba, Digital Apps
-    sap1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.5), Inches(1.8), Inches(1.0), Inches(1.0))
-    sap1.fill.solid()
-    sap1.fill.fore_color.rgb = WHITE
-    sap1.line.color.rgb = azure_blue
-    p = sap1.text_frame.paragraphs[0]
-    p.text = "SAP HANA"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=9, bold=True)
-    
-    sap2 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.5), Inches(3.2), Inches(1.0), Inches(1.0))
-    sap2.fill.solid()
-    sap2.fill.fore_color.rgb = WHITE
-    sap2.line.color.rgb = azure_blue
-    p = sap2.text_frame.paragraphs[0]
-    p.text = "SAP Ariba"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=9, bold=True)
-
-    app1 = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(0.5), Inches(4.6), Inches(1.0), Inches(1.0))
-    app1.fill.solid()
-    app1.fill.fore_color.rgb = WHITE
-    app1.line.color.rgb = azure_blue
-    p = app1.text_frame.paragraphs[0]
-    p.text = "Digital Apps"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=9, bold=True)
-
-    # Middle: ELT / Orchestration Tool (Azure Data Factory)
-    adf_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(2.3), Inches(1.5), Inches(2.2), Inches(2.8))
-    adf_box.fill.solid()
-    adf_box.fill.fore_color.rgb = WHITE
-    adf_box.line.color.rgb = azure_blue
-    try:
-        adf_box.line.dash_style = 2
-    except:
-        pass
         
-    tx_adf = slide.shapes.add_textbox(Inches(2.3), Inches(3.7), Inches(2.2), Inches(0.4))
-    p = tx_adf.text_frame.paragraphs[0]
-    p.text = "ELT/Orchestration Tool"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=10, bold=True)
+    db_name = data.get("db_tech", "PostgreSQL") if data else "PostgreSQL"
+    backend_name = data.get("backend_tech", "FastAPI") if data else "FastAPI"
+    
+    # Check cloud tools
+    ingestion_tool = "Azure Data Factory"
+    monitor_tool = "Azure Monitor"
+    storage_tool = "Azure Blob Storage"
+    search_tool = "Azure Cognitive Search"
+    k8s_cluster = "AKS Cluster"
+    
+    if cloud_name == "AWS":
+        ingestion_tool = "AWS Glue"
+        monitor_tool = "AWS CloudWatch"
+        storage_tool = "AWS S3"
+        search_tool = "Amazon Kendra"
+        k8s_cluster = "EKS Cluster"
+    elif cloud_name == "Google Cloud":
+        ingestion_tool = "Google Cloud Dataflow"
+        monitor_tool = "Google Cloud Monitoring"
+        storage_tool = "Google Cloud Storage"
+        search_tool = "Google Cloud Vertex AI Search"
+        k8s_cluster = "GKE Cluster"
 
-    adf_icon = slide.shapes.add_shape(MSO_SHAPE.CLOUD, Inches(2.8), Inches(1.8), Inches(1.2), Inches(0.9))
-    adf_icon.fill.solid()
-    adf_icon.fill.fore_color.rgb = azure_blue
-    p = adf_icon.text_frame.paragraphs[0]
-    p.text = "ADF"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=10, color=WHITE, bold=True)
+    mermaid_code = (
+        "graph LR\n"
+        "    subgraph OnPrem [On-Premises]\n"
+        f"        Client[Client Artefacts] --> ADF[{ingestion_tool}: Ingestion]\n"
+        "    end\n"
+        "    \n"
+        "    subgraph Monitoring [Monitoring]\n"
+        f"        Monitor[{monitor_tool}: Logs & Metrics] --> Alerts[Alerts & Governance]\n"
+        "    end\n"
+        "    \n"
+        "    subgraph DataFlow [Data Flow]\n"
+        "        SJSON[Structured JSON Intermediate] --> DPS[Deterministic Proposal Structure] --> PPDraft[PowerPoint Draft] --> HR[Human Review] --> AP[Approved Proposal]\n"
+        "    end\n"
+        "    \n"
+        f"    subgraph Cloud [{cloud_name} Cloud Platform]\n"
+        f"        AKS[{k8s_cluster}: Multi-Agent System]\n"
+        f"        FastAPI[{backend_name}: Agent Services] --> Gateway[API Gateway: {backend_name}] --> ExtAPI[External APIs: PowerPoint Rendering]\n"
+        f"        DB[{db_name}: Knowledge Base] --> Embed[pgvector: Embeddings] --> Dashboard[Human Review Dashboard]\n"
+        "        VS[ChromaDB: Vector Store] --> Embed\n"
+        f"        Blob[{storage_tool}: Artefacts]\n"
+        f"        Search[{search_tool}: Indexing] --> RAG[RAG: Requirement Mapping] --> Design[Solution Design]\n"
+        "    end\n"
+        "    \n"
+        "    ADF --> AKS\n"
+        "    ADF --> SJSON\n"
+        "    AKS --> Monitor\n"
+        "    AKS --> DPS\n"
+        "    AKS --> FastAPI\n"
+        "    AKS --> DB\n"
+        "    AKS --> VS\n"
+        "    AKS --> Blob\n"
+        "    AKS --> Search\n"
+    )
 
-    # Azure SQL Server
-    sql_box = slide.shapes.add_shape(MSO_SHAPE.CAN, Inches(5.2), Inches(1.2), Inches(1.2), Inches(1.2))
-    sql_box.fill.solid()
-    sql_box.fill.fore_color.rgb = WHITE
-    sql_box.line.color.rgb = azure_blue
-    
-    tx_sql = slide.shapes.add_textbox(Inches(5.2), Inches(1.5), Inches(1.2), Inches(0.6))
-    p = tx_sql.text_frame.paragraphs[0]
-    p.text = "SQL Server"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=9, bold=True)
-    
-    # Pyramid / Triangle for Azure Synapse
-    syn_box = slide.shapes.add_shape(MSO_SHAPE.ISOSCELES_TRIANGLE, Inches(6.8), Inches(2.2), Inches(2.5), Inches(3.5))
-    syn_box.fill.solid()
-    syn_box.fill.fore_color.rgb = RGBColor(220, 235, 250)
-    syn_box.line.color.rgb = azure_blue
-    
-    tx_syn = slide.shapes.add_textbox(Inches(6.8), Inches(3.2), Inches(2.5), Inches(1.5))
-    p = tx_syn.text_frame.paragraphs[0]
-    p.text = "Reporting Layer\n\nCommon Data\n\nRAW Layer"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=9, bold=True, color=CHARCOAL)
-    
-    # Tableau
-    tab_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(8.2), Inches(1.5), Inches(1.5), Inches(1.2))
-    tab_box.fill.solid()
-    tab_box.fill.fore_color.rgb = WHITE
-    tab_box.line.color.rgb = GREY
-    try:
-        tab_box.line.dash_style = 2
-    except:
-        pass
-        
-    tx_tab = slide.shapes.add_textbox(Inches(8.2), Inches(1.6), Inches(1.5), Inches(1.0))
-    p = tx_tab.text_frame.paragraphs[0]
-    p.text = "+ tableau\n\nReporting"
-    p.alignment = PP_ALIGN.CENTER
-    set_font(p.runs[0], size=10, bold=True)
-
-    # Data flow arrows
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.5), Inches(2.3), Inches(0.8), Inches(0.15))
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.5), Inches(3.7), Inches(0.8), Inches(0.15))
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(1.5), Inches(5.1), Inches(0.8), Inches(0.15))
-    
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(4.5), Inches(2.9), Inches(2.2), Inches(0.15)) # to Synapse
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(4.5), Inches(1.8), Inches(0.7), Inches(0.15)) # to SQL
-    
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(6.4), Inches(2.2), Inches(0.6), Inches(0.15)) # SQL to Synapse
-    slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(9.0), Inches(2.6), Inches(0.5), Inches(0.15)) # Synapse to Tableau
-
-    # Legend
-    leg_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(7.5), Inches(6.0), Inches(2.2), Inches(1.2))
-    leg_box.fill.solid()
-    leg_box.fill.fore_color.rgb = RGBColor(250, 240, 230)
-    leg_box.line.color.rgb = ORANGE
-    p = leg_box.text_frame.paragraphs[0]
-    p.text = "Legend\nDaily\n3 hours Batch\nOne time"
-    set_font(p.runs[0], size=9)
+    temp_img_path = render_mermaid_to_image(mermaid_code)
+    if temp_img_path and os.path.exists(temp_img_path):
+        try:
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.0), Inches(9.6), Inches(6.0))
+        except Exception as e:
+            print(f"Failed to add mermaid image to Landscape slide: {e}")
+        finally:
+            try:
+                os.remove(temp_img_path)
+            except:
+                pass
 
 
 def generate_pptx(data, output_path):
@@ -384,7 +531,7 @@ def generate_pptx(data, output_path):
     set_font(p_main.runs[0], size=36, bold=True, color=WHITE)
     
     p_meta = tf.add_paragraph()
-    p_meta.text = f"\nTimeline: {safe_text(data.get('project_duration', 'N/A'))}  |  Target Budget: {safe_text(data.get('budget', 'N/A'))}\nDraft Date: July 2026"
+    p_meta.text = "\nDraft Date: July 2026"
     set_font(p_meta.runs[0], size=11, color=ORANGE)
 
     # ----------------------------------------------------
@@ -754,27 +901,187 @@ def generate_pptx(data, output_path):
     sim_projects = data.get("similar_projects", [])
     
     if sim_projects:
-        for proj in sim_projects:
+        for idx_proj, proj in enumerate(sim_projects):
             slide = prs.slides.add_slide(blank_slide_layout)
-            create_slide_header(slide, "Case Study", "Past credentials and successful delivery outcomes")
+            
+            # Dynamic header title
+            p_name = safe_text(proj.get('project_name', 'Migration'))
+            c_ind = safe_text(proj.get('client_industry', 'Client'))
+            title_text = f"Case Study {idx_proj + 1}: {p_name} ({c_ind})"
+            create_slide_header(slide, title_text, "Past credentials and successful delivery outcomes")
             add_footer(slide)
             
-            p_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(1.0), Inches(2.0), Inches(8.0), Inches(4.0))
-            p_box.fill.solid()
-            p_box.fill.fore_color.rgb = OFF_WHITE
-            p_box.line.color.rgb = GOLD
-            p_box.line.width = Pt(1.5)
+            # Left Column: High Level Summary Box
+            left_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.5), Inches(1.5), Inches(4.3), Inches(5.2))
+            left_box.fill.solid()
+            left_box.fill.fore_color.rgb = WHITE
+            left_box.line.color.rgb = CHARCOAL
+            left_box.line.width = Pt(1)
             
-            tf_p = p_box.text_frame
-            tf_p.word_wrap = True
+            # Label on the border for High Level Summary
+            label_box = slide.shapes.add_textbox(Inches(0.7), Inches(1.35), Inches(2.2), Inches(0.3))
+            tf_lbl = label_box.text_frame
+            tf_lbl.word_wrap = True
+            tf_lbl.margin_left = Inches(0.05)
+            tf_lbl.margin_right = Inches(0.05)
+            tf_lbl.margin_top = Inches(0)
+            tf_lbl.margin_bottom = Inches(0)
+            p_lbl = tf_lbl.paragraphs[0]
+            p_lbl.text = " High Level Summary "
+            set_font(p_lbl.runs[0], size=11, bold=True, color=CHARCOAL)
+            label_box.fill.solid()
+            label_box.fill.fore_color.rgb = WHITE
+            label_box.line.fill.background()
             
-            p_title = tf_p.paragraphs[0]
-            p_title.text = f"{safe_text(proj.get('client_industry', 'Industry'))} | {safe_text(proj.get('project_name', 'Project'))}"
-            set_font(p_title.runs[0], size=20, bold=True, color=ORANGE)
+            # Content inside Left Column
+            content_box = slide.shapes.add_textbox(Inches(0.6), Inches(1.7), Inches(4.1), Inches(4.9))
+            tf_c = content_box.text_frame
+            tf_c.word_wrap = True
+            tf_c.margin_left = Inches(0)
+            tf_c.margin_right = Inches(0)
+            tf_c.margin_top = Inches(0)
+            tf_c.margin_bottom = Inches(0)
             
-            p_outcome = tf_p.add_paragraph()
-            p_outcome.text = f"\nOutcome: {safe_text(proj.get('outcome', ''))}"
-            set_font(p_outcome.runs[0], size=16, color=CHARCOAL)
+            # Business Problem
+            p_bp = tf_c.paragraphs[0]
+            p_bp.text = "Business Problem"
+            set_font(p_bp.runs[0], size=11, bold=True, color=CHARCOAL)
+            p_bp.space_after = Pt(2)
+            
+            bp_list = proj.get("business_problem", [])
+            if not bp_list:
+                bp_list = ["No business problem description provided."]
+            for bp in bp_list:
+                p = tf_c.add_paragraph()
+                p.text = f"• {safe_text(bp)}"
+                set_font(p.runs[0], size=7.5, color=CHARCOAL)
+                p.space_after = Pt(2)
+                
+            # Spacing
+            p_space = tf_c.add_paragraph()
+            p_space.text = ""
+            p_space.space_after = Pt(2)
+            
+            # Our Approach
+            p_ap = tf_c.add_paragraph()
+            p_ap.text = "Our Approach"
+            set_font(p_ap.runs[0], size=11, bold=True, color=CHARCOAL)
+            p_ap.space_after = Pt(2)
+            
+            ap_list = proj.get("our_approach", [])
+            if not ap_list:
+                ap_list = ["No approach description provided."]
+            for ap in ap_list:
+                p = tf_c.add_paragraph()
+                p.text = f"• {safe_text(ap)}"
+                set_font(p.runs[0], size=7.5, color=CHARCOAL)
+                p.space_after = Pt(2)
+            
+            # Right Column Top: Technical Architecture Box
+            right_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(5.0), Inches(1.5), Inches(4.5), Inches(3.6))
+            right_box.fill.solid()
+            right_box.fill.fore_color.rgb = WHITE
+            right_box.line.color.rgb = CHARCOAL
+            right_box.line.width = Pt(1)
+            
+            # Label on the border for Technical Architecture
+            r_label_box = slide.shapes.add_textbox(Inches(5.2), Inches(1.35), Inches(2.2), Inches(0.3))
+            tf_rlbl = r_label_box.text_frame
+            tf_rlbl.word_wrap = True
+            tf_rlbl.margin_left = Inches(0.05)
+            tf_rlbl.margin_right = Inches(0.05)
+            tf_rlbl.margin_top = Inches(0)
+            tf_rlbl.margin_bottom = Inches(0)
+            p_rlbl = tf_rlbl.paragraphs[0]
+            p_rlbl.text = " Technical Architecture "
+            set_font(p_rlbl.runs[0], size=11, bold=True, color=CHARCOAL)
+            r_label_box.fill.solid()
+            r_label_box.fill.fore_color.rgb = WHITE
+            r_label_box.line.fill.background()
+            
+            # Mermaid Diagram
+            mermaid_code = proj.get("tech_architecture_mermaid")
+            if mermaid_code:
+                try:
+                    temp_img_path = render_mermaid_to_image(mermaid_code)
+                    if temp_img_path and os.path.exists(temp_img_path):
+                        add_picture_proportionally(slide, temp_img_path, Inches(5.1), Inches(1.8), Inches(4.3), Inches(1.8))
+                except Exception as img_e:
+                    print(f"Failed to add case study mermaid image: {img_e}")
+                    
+            # 3 Side-by-Side Explanation boxes underneath the diagram
+            explanations = proj.get("tech_architecture_explanation", [])
+            while len(explanations) < 3:
+                explanations.append("N/A")
+                
+            box_width = Inches(1.35)
+            box_height = Inches(1.3)
+            box_top = Inches(3.7)
+            
+            for idx_exp, exp_text in enumerate(explanations[:3]):
+                box_left = Inches(5.1 + idx_exp * 1.45)
+                s_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, box_left, box_top, box_width, box_height)
+                s_box.fill.solid()
+                s_box.fill.fore_color.rgb = OFF_WHITE
+                s_box.line.color.rgb = CHARCOAL
+                s_box.line.width = Pt(0.5)
+                
+                tf_s = s_box.text_frame
+                tf_s.word_wrap = True
+                tf_s.margin_left = Inches(0.05)
+                tf_s.margin_right = Inches(0.05)
+                tf_s.margin_top = Inches(0.05)
+                tf_s.margin_bottom = Inches(0.05)
+                
+                p_s = tf_s.paragraphs[0]
+                p_s.text = safe_text(exp_text)
+                set_font(p_s.runs[0], size=7, color=CHARCOAL)
+                
+            # Right Column Bottom Left: Key Technologies
+            tech_header_box = slide.shapes.add_textbox(Inches(5.0), Inches(5.1), Inches(2.2), Inches(0.3))
+            tf_th = tech_header_box.text_frame
+            tf_th.word_wrap = True
+            p_th = tf_th.paragraphs[0]
+            p_th.text = "Key Technologies"
+            set_font(p_th.runs[0], size=11, bold=True, color=CHARCOAL)
+            
+            tech_list_box = slide.shapes.add_textbox(Inches(5.0), Inches(5.4), Inches(2.2), Inches(1.6))
+            tf_tl = tech_list_box.text_frame
+            tf_tl.word_wrap = True
+            tf_tl.margin_left = Inches(0)
+            tf_tl.margin_right = Inches(0)
+            tf_tl.margin_top = Inches(0)
+            tf_tl.margin_bottom = Inches(0)
+            
+            tech_list = proj.get("key_technologies", [])[:3]
+            for tech in tech_list:
+                p = tf_tl.add_paragraph() if tf_tl.paragraphs[0].text else tf_tl.paragraphs[0]
+                p.text = f"• {safe_text(tech)}"
+                set_font(p.runs[0], size=7.0, color=CHARCOAL)
+                p.space_after = Pt(1)
+                
+            # Right Column Bottom Right: Benefits / Outcome
+            ben_header_box = slide.shapes.add_textbox(Inches(7.3), Inches(5.1), Inches(2.2), Inches(0.3))
+            tf_bh = ben_header_box.text_frame
+            tf_bh.word_wrap = True
+            p_bh = tf_bh.paragraphs[0]
+            p_bh.text = "Benefits/Outcome"
+            set_font(p_bh.runs[0], size=11, bold=True, color=CHARCOAL)
+            
+            ben_list_box = slide.shapes.add_textbox(Inches(7.3), Inches(5.4), Inches(2.2), Inches(1.6))
+            tf_bl = ben_list_box.text_frame
+            tf_bl.word_wrap = True
+            tf_bl.margin_left = Inches(0)
+            tf_bl.margin_right = Inches(0)
+            tf_bl.margin_top = Inches(0)
+            tf_bl.margin_bottom = Inches(0)
+            
+            ben_list = proj.get("benefits_outcome", [])[:3]
+            for ben in ben_list:
+                p = tf_bl.add_paragraph() if tf_bl.paragraphs[0].text else tf_bl.paragraphs[0]
+                p.text = f"• {safe_text(ben)}"
+                set_font(p.runs[0], size=7.0, color=CHARCOAL)
+                p.space_after = Pt(1)
 
     # ----------------------------------------------------
     # SLIDE 6: Effort & Person-Hour Conversion
@@ -911,134 +1218,19 @@ def generate_pptx(data, output_path):
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
     # ----------------------------------------------------
-    # DYNAMIC COMPLEX ARCHITECTURE DIAGRAMS
-    # ----------------------------------------------------
-    complex_diagrams = data.get("complex_diagrams", [])
-    for diag in complex_diagrams:
-        slide = prs.slides.add_slide(blank_slide_layout)
-        
-        # Background
-        bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
-        bg.fill.solid()
-        bg.fill.fore_color.rgb = RGBColor(248, 249, 250)
-        bg.line.fill.background()
-        
-        create_slide_header(slide, safe_text(diag.get("title", "Architecture Diagram")), "Dynamic Architecture generated from AI Payload")
-        add_footer(slide)
-        
-        columns = diag.get("columns", [])
-        if not columns:
-            continue
-            
-        # Total width ratios
-        total_ratio = sum(col.get("width_ratio", 1.0) for col in columns)
-        
-        # Working area: Left 0.5, Right 9.5 -> width = 9.0
-        # Top 1.2, Bottom 6.8 -> height = 5.6
-        avail_width = 9.0
-        start_x = 0.5
-        
-        for col in columns:
-            ratio = col.get("width_ratio", 1.0)
-            col_width = (ratio / total_ratio) * avail_width
-            
-            # Draw Column Header
-            c_header = slide.shapes.add_textbox(Inches(start_x), Inches(1.0), Inches(col_width - 0.1), Inches(0.4))
-            p_ch = c_header.text_frame.paragraphs[0]
-            p_ch.text = safe_text(col.get("name", ""))
-            p_ch.alignment = PP_ALIGN.CENTER
-            set_font(p_ch.runs[0], size=12, bold=True, color=CHARCOAL)
-            
-            zones = col.get("zones", [])
-            if zones:
-                zone_h = 5.4 / len(zones)
-                current_y = 1.4
-                
-                for zone in zones:
-                    bg_color_str = zone.get("bg_color", "transparent")
-                    if bg_color_str == "light_green":
-                        fill_color = RGBColor(220, 235, 200)
-                    elif bg_color_str == "light_grey":
-                        fill_color = RGBColor(230, 230, 230)
-                    elif bg_color_str == "light_blue":
-                        fill_color = RGBColor(210, 230, 250)
-                    elif bg_color_str == "white":
-                        fill_color = RGBColor(255, 255, 255)
-                    else:
-                        fill_color = None
-                        
-                    if fill_color:
-                        z_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(start_x), Inches(current_y), Inches(col_width - 0.1), Inches(zone_h - 0.1))
-                        z_box.fill.solid()
-                        z_box.fill.fore_color.rgb = fill_color
-                        z_box.line.color.rgb = GREY
-                        z_box.line.width = Pt(1)
-                    else:
-                        # transparent dashed border
-                        z_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(start_x), Inches(current_y), Inches(col_width - 0.1), Inches(zone_h - 0.1))
-                        z_box.fill.background()
-                        z_box.line.color.rgb = GREY
-                        z_box.line.width = Pt(1)
-                        # dash_style 2 is dashed
-                        try:
-                            z_box.line.dash_style = 2
-                        except:
-                            pass
-                    
-                    # Zone Title
-                    z_title = slide.shapes.add_textbox(Inches(start_x), Inches(current_y), Inches(col_width - 0.1), Inches(0.3))
-                    p_zt = z_title.text_frame.paragraphs[0]
-                    p_zt.text = safe_text(zone.get("name", ""))
-                    set_font(p_zt.runs[0], size=10, bold=True, color=CHARCOAL)
-                    
-                    items = zone.get("items", [])
-                    if items:
-                        # simple vertical or 2x2 grid
-                        cols_grid = 2 if len(items) > 3 else 1
-                        item_w = (col_width - 0.4) / cols_grid
-                        item_h = 0.6
-                        
-                        for idx, item in enumerate(items):
-                            r = idx // cols_grid
-                            c = idx % cols_grid
-                            ix = start_x + 0.15 + (c * (item_w + 0.1))
-                            iy = current_y + 0.4 + (r * (item_h + 0.2))
-                            
-                            shape_type_str = item.get("shape", "box")
-                            if shape_type_str == "database":
-                                stype = MSO_SHAPE.CAN
-                            elif shape_type_str == "cloud":
-                                stype = MSO_SHAPE.CLOUD
-                            else:
-                                stype = MSO_SHAPE.ROUNDED_RECTANGLE
-                                
-                            item_box = slide.shapes.add_shape(stype, Inches(ix), Inches(iy), Inches(item_w), Inches(item_h))
-                            item_box.fill.solid()
-                            item_box.fill.fore_color.rgb = WHITE
-                            item_box.line.color.rgb = ORANGE
-                            item_box.line.width = Pt(1.5)
-                            
-                            # Item Text
-                            it = slide.shapes.add_textbox(Inches(ix), Inches(iy + item_h/2 - 0.2), Inches(item_w), Inches(0.4))
-                            pit = it.text_frame.paragraphs[0]
-                            pit.text = safe_text(item.get("name", ""))
-                            pit.alignment = PP_ALIGN.CENTER
-                            set_font(pit.runs[0], size=9, bold=True, color=CHARCOAL)
-                            
-                    current_y += zone_h
-            
-            start_x += col_width
-
-    # ----------------------------------------------------
     # HARDCODED "SAME TO SAME" ARCHITECTURE DIAGRAMS
     # ----------------------------------------------------
     # Slide 8: Reference Architecture
     ref_slide = prs.slides.add_slide(blank_slide_layout)
-    add_reference_architecture_slide(ref_slide, prs)
+    add_reference_architecture_slide(ref_slide, prs, data)
 
     # Slide 9: Azure Landscape Architecture
     azure_slide = prs.slides.add_slide(blank_slide_layout)
-    add_azure_landscape_architecture_slide(azure_slide, prs)
+    add_azure_landscape_architecture_slide(azure_slide, prs, data)
+
+
+
+
 
     # Save presentation
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

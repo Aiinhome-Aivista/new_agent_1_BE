@@ -207,8 +207,9 @@ def safe_json_loads(json_str, fallback):
         print(f"Failed to parse JSON: {e}. Raw content: {json_str}")
         return fallback
 
-def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None):
+def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None):
     """The full Multi-Agent pipeline, executing step-by-step using LLM and fallback defaults."""
+    full_case_study_text = ""
     try:
         # Initialize LangChain Agents
         intake_agent = IntakeAgent()
@@ -338,6 +339,20 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                 }
                 arango_client.insert("documents", doc_record)
 
+        # Process case study documents if provided
+        extracted_case_study_text_blocks = []
+        parsed_case_study_files = 0
+        if case_study_files:
+            for file_data in case_study_files:
+                saved_path = file_data.get("saved_path")
+                orig_name = file_data.get("original_name")
+                if saved_path and os.path.exists(saved_path):
+                    txt = extract_text(saved_path)
+                    if txt:
+                        parsed_case_study_files += 1
+                        extracted_case_study_text_blocks.append(f"--- Case Study Document: {orig_name} ---\n{txt}")
+        full_case_study_text = "\n\n".join(extracted_case_study_text_blocks).strip()
+
         full_document_text = "\n\n".join(extracted_text_blocks).strip()
         
         # Validation
@@ -425,7 +440,8 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "chat_explanation": tech_data.get("chat_explanation", ""),
             "rag_options": advanced_options.get("rag_options", []),
             "action_engine_options": advanced_options.get("action_engine_options", []),
-            "guardrail_options": advanced_options.get("guardrail_options", [])
+            "guardrail_options": advanced_options.get("guardrail_options", []),
+            "case_study_text": full_case_study_text
         }
         update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
         
@@ -460,6 +476,38 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         budget = final_budget  # Override with user-selected budget
         requirements = partial_state.get("requirements", [])
         gaps = partial_state.get("gaps", [])
+        case_study_text = partial_state.get("case_study_text", "")
+        
+        # Retrieve persistent case studies from DB
+        db_case_study_text = ""
+        db_case_studies_list = []
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute("SELECT name, description FROM knowledge_assets WHERE category = 'Case Study' ORDER BY created_at DESC")
+            db_rows = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            
+            db_case_studies = []
+            for r in db_rows:
+                try:
+                    desc_obj = json.loads(r["description"])
+                    db_case_studies_list.append(desc_obj)
+                    db_case_studies.append(f"--- Previous Project Case Study: {r['name']} ---\n" + json.dumps(desc_obj, indent=2))
+                except:
+                    pass
+            db_case_study_text = "\n\n".join(db_case_studies)
+        except Exception as db_err:
+            print(f"Error fetching persistent case studies: {db_err}")
+            
+        combined_case_study_text = ""
+        if case_study_text:
+            combined_case_study_text += case_study_text
+        if db_case_study_text:
+            if combined_case_study_text:
+                combined_case_study_text += "\n\n"
+            combined_case_study_text += db_case_study_text
         
         # ----------------------------------------------------
         # 3. SOLUTION DESIGN AGENT (Tree-of-Thoughts Architecture)
@@ -477,7 +525,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             duration=project_duration,
             selected_rag=selected_rag,
             selected_guardrail=selected_guardrail,
-            selected_action_engine=selected_action_engine
+            selected_action_engine=selected_action_engine,
+            case_study_text=combined_case_study_text
         )
         solution_pillars = design_data.get("solution_pillars", [])
         architecture = design_data.get("architecture", [])
@@ -575,7 +624,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "business_summary": design_data.get("business_summary", ""),
             "data_flow": design_data.get("data_flow", []),
             "infrastructure_approximation": design_data.get("infrastructure_approximation", []),
-            "similar_projects": design_data.get("similar_projects", []),
+            "similar_projects": db_case_studies_list if db_case_studies_list else design_data.get("similar_projects", []),
             "timeline_phases": timeline_phases,
             "resources": resources,
             "skills_mapping": skills_mapping,
@@ -687,11 +736,11 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
 
-def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None):
+def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None):
     """Triggers the orchestrator thread asynchronously so UI remains non-blocking."""
     thread = threading.Thread(
         target=run_orchestration,
-        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text)
+        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files)
     )
     thread.daemon = True
     thread.start()

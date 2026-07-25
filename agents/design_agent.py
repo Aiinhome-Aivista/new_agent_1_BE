@@ -12,7 +12,7 @@ class DesignAgent:
         self.llm = get_llm(temperature=0.3)
         self.llm_json = get_llm(temperature=0.2, json_mode=True)
 
-    def generate_design(self, ui_tech: str, backend_tech: str, db_tech: str, requirements: list, budget: str, duration: str, selected_rag: str = "", selected_guardrail: str = "", selected_action_engine: str = "") -> dict:
+    def generate_design(self, ui_tech: str, backend_tech: str, db_tech: str, requirements: list, budget: str, duration: str, selected_rag: str = "", selected_guardrail: str = "", selected_action_engine: str = "", case_study_text: str = "") -> dict:
         """
         Runs ToT architecture generation.
         1. Explores candidate topologies.
@@ -45,11 +45,22 @@ class DesignAgent:
                 "'Application Logic (API Backend)', 'Data Integration & Cache Layer') where each layer object contains "
                 "'name' (string) and 'components' (list of strings representing systems/frameworks).\n"
                 "- 'infrastructure_approximation': a list of exactly 5 objects representing an Azure Cost Calculator estimate. Each object has 'component' (Azure service name), 'spec', and 'estimated_monthly_cost'.\n"
-                "- 'similar_projects': a list of exactly 2 objects, each with 'client_industry', 'project_name', and 'outcome'.\n"
-                "- 'complex_diagrams': a list of exactly 2 complex architecture diagram objects (e.g. Reference Architecture, Cloud Architecture). Each object must have a 'title' string, and a 'columns' list. Each column has 'name', 'width_ratio' (float), and a 'zones' list. Each zone has 'name', optional 'bg_color' (e.g., 'light_green', 'light_blue', 'light_grey', 'white'), and an 'items' list. Each item has 'name' and 'shape' (must be one of: 'box', 'database', 'cloud').\n\n"
+                "- 'similar_projects': a list of exactly 2 objects representing detailed previous project case studies. "
+                "If previous case study text/documents are provided in user input, analyze and extract/summarize them to construct these case studies. "
+                "If not provided, generate 2 highly relevant realistic case studies matching the client's RFP requirements. "
+                "Each case study object must have these keys:\n"
+                "  * 'project_name': short name of the project (e.g., 'Teradata to Snowflake migration').\n"
+                "  * 'client_industry': industry/details of the client (e.g., 'Lifestyle Footwear Company in US').\n"
+                "  * 'business_problem': a list of exactly 3-4 strings representing key business/technical challenges.\n"
+                "  * 'our_approach': a list of exactly 3-4 strings detailing the steps or architectural choices built to solve it.\n"
+                "  * 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing the technical architecture of that case study.\n"
+                "  * 'tech_architecture_explanation': a list of exactly 3 strings representing concise summaries (1-2 sentences) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting.\n"
+                "  * 'key_technologies': a list of exactly 3-4 technologies used (e.g. ['Snowflake', 'Azure Data Factory']).\n"
+                "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n"
+                "- 'complex_diagrams': a list of exactly 2 complex architecture diagram objects (e.g., 'Reference Architecture' and 'Cloud/Integration Architecture'). Each object must have a 'title' string, and a 'mermaid_code' string representing a valid Mermaid.js flowchart (starting with 'graph LR' for optimal wide-screen presentation slide layout) that describes the architecture in high enterprise detail. Use nested subgraphs (like subgraphs for 'External Sources', 'Ingestion', 'Cloud Platform', 'On-Premises', 'Datamarts', 'Use Cases' or 'Reporting' as appropriate) to create clear enterprise-level logical boundaries. Use database shapes (like '[(Database Name)]') for storage components and connect the components with meaningful directional arrows to show exact data pipelines. Ensure the diagrams are clean, detailed, and professional.\n\n"
                 "Do not include any explanation or markdown formatting outside the JSON."
             )),
-            ("user", "Requirements:\n{requirements}\n\nBudget: {budget}\nDuration: {duration}")
+            ("user", "Requirements:\n{requirements}\n\nBudget: {budget}\nDuration: {duration}\n\nCase Study Documents Text:\n{case_study_text}")
         ])
         
         chain = tot_prompt | self.llm_json
@@ -77,8 +88,144 @@ class DesignAgent:
             {"component": "Vector Database", "spec": "Managed Qdrant Cluster", "estimated_monthly_cost": "$200"}
         ]
         default_similar_projects = [
-            {"client_industry": "Financial Services", "project_name": "Autonomous Deal Assistant", "outcome": "Reduced proposal generation time by 40%."},
-            {"client_industry": "Healthcare", "project_name": "Compliance RAG Engine", "outcome": "Automated security mapping for 10,00+ documents."}
+            {
+                "project_name": "Autonomous Deal Assistant",
+                "client_industry": "Financial Services Client",
+                "business_problem": [
+                    "Different systems were used to store business modules.",
+                    "Quality check across different systems were inconsistent.",
+                    "No single source of truth for proposal templates."
+                ],
+                "our_approach": [
+                    "Migrated legacy templates to a central knowledge repository.",
+                    "Designed automatic quality checks and guardrails.",
+                    "Built an agentic workflow for bid generation."
+                ],
+                "tech_architecture_mermaid": "graph LR\n    S[Sources] --> A[API]\n    A --> DB[(PostgreSQL)]\n    A --> V[(Qdrant)]",
+                "tech_architecture_explanation": [
+                    "RFP documents ingested securely.",
+                    "Agents query Qdrant and compile sections.",
+                    "PowerPoint generation engine creates deliverable."
+                ],
+                "key_technologies": [
+                    "React",
+                    "Flask",
+                    "Qdrant",
+                    "python-pptx"
+                ],
+                "benefits_outcome": [
+                    "Reduced proposal generation time by 40%.",
+                    "Ensured 100% compliance with corporate guidelines.",
+                    "Enabled presales scaling to 5x more bids."
+                ]
+            },
+            {
+                "project_name": "Compliance RAG Engine",
+                "client_industry": "Healthcare Provider",
+                "business_problem": [
+                    "Manual compliance checking was slow and error-prone.",
+                    "Highly sensitive patient data required strict governance.",
+                    "Frequent regulatory updates caused mapping challenges."
+                ],
+                "our_approach": [
+                    "Implemented semantic search on policy documents.",
+                    "Added LLM guardrails for healthcare compliance.",
+                    "Integrated real-time auditing and logging."
+                ],
+                "tech_architecture_mermaid": "graph LR\n    D[Docs] --> I[Parser]\n    I --> Ch[ChromaDB]\n    Ch --> Q[Query]",
+                "tech_architecture_explanation": [
+                    "Healthcare policies ingested and chunked.",
+                    "ChromaDB stores embeddings with semantic metadata.",
+                    "Audit dashboard exposes validation logs."
+                ],
+                "key_technologies": [
+                    "ChromaDB",
+                    "LangChain",
+                    "Docker",
+                    "FastAPI"
+                ],
+                "benefits_outcome": [
+                    "Automated security mapping for 10,000+ documents.",
+                    "Reduced audit cycle duration by 60%.",
+                    "Achieved 100% compliance audit readiness."
+                ]
+            }
+        ]
+        default_complex_diagrams = [
+            {
+                "title": "Reference Architecture",
+                "mermaid_code": (
+                    "graph LR\n"
+                    "    subgraph External [External Data Sources]\n"
+                    "        E1[Website Clickstream]\n"
+                    "        E2[Salesforce CRM]\n"
+                    "        E3[Partner Data Assets]\n"
+                    "    end\n"
+                    "    subgraph Internal [Internal Data Sources]\n"
+                    "        I1[SAP ERP]\n"
+                    "        I2[Secondary Sales DB]\n"
+                    "        I3[Inhouse Applications]\n"
+                    "    end\n"
+                    "    subgraph Cloud [Cloud Platform]\n"
+                    "        subgraph Ingestion [Data Ingestion & Orchestration]\n"
+                    "            ADF(Azure Data Factory)\n"
+                    "            Batch[Batch Compute]\n"
+                    "        end\n"
+                    "        subgraph Raw [Raw Data Zone]\n"
+                    "            R1[(Raw DB)] --> R2[(Intermediate Storage)]\n"
+                    "        end\n"
+                    "        subgraph Curated [Curated Zone]\n"
+                    "            C1[(Curated Object Storage)]\n"
+                    "        end\n"
+                    "        subgraph DM [Datamarts]\n"
+                    "            DM1[(DM-1)]\n"
+                    "            DM2[(DM-2)]\n"
+                    "            DM3[(DM-3)]\n"
+                    "        end\n"
+                    "        Ingestion --> Raw\n"
+                    "        Raw --> Curated\n"
+                    "        Curated --> DM\n"
+                    "    end\n"
+                    "    subgraph UseCases [Use Cases]\n"
+                    "        U1[Cloud API]\n"
+                    "        U2[Advanced Analytics]\n"
+                    "        U3[Business Intelligence]\n"
+                    "    end\n"
+                    "    External --> Ingestion\n"
+                    "    Internal --> Ingestion\n"
+                    "    DM --> UseCases"
+                )
+            },
+            {
+                "title": "Cloud Architecture",
+                "mermaid_code": (
+                    "graph LR\n"
+                    "    subgraph Sources [Ingestion Inputs]\n"
+                    "        S1[React Web App]\n"
+                    "        S2[3rd Party External APIs]\n"
+                    "        S3[Azure Event Grid]\n"
+                    "    end\n"
+                    "    subgraph Integration [Daily ETL Pipelines]\n"
+                    "        ADF(Azure Data Factory)\n"
+                    "        Func[Azure Functions]\n"
+                    "        Entra[Microsoft Entra ID]\n"
+                    "    end\n"
+                    "    subgraph Storage [Data Platform Layers]\n"
+                    "        Raw[(Blob Raw Container)]\n"
+                    "        SQL[(Azure SQL / Cosmos)]\n"
+                    "        Synapse[(Azure Synapse Analytics)]\n"
+                    "    end\n"
+                    "    subgraph Consumption [Reporting & DevOps]\n"
+                    "        Tableau[Tableau Desktop / Cloud]\n"
+                    "        DevOps[Azure DevOps & GitHub Actions]\n"
+                    "    end\n"
+                    "    Sources --> ADF\n"
+                    "    ADF --> Raw\n"
+                    "    Raw --> SQL\n"
+                    "    SQL --> Synapse\n"
+                    "    Synapse --> Tableau"
+                )
+            }
         ]
         
         try:
@@ -91,7 +238,8 @@ class DesignAgent:
                 "selected_action_engine": selected_action_engine or "None selected",
                 "requirements": json.dumps(requirements),
                 "budget": budget,
-                "duration": duration
+                "duration": duration,
+                "case_study_text": case_study_text or "No case study documents provided."
             })
             content = res.content.strip()
             if content.startswith("```json"):
@@ -112,7 +260,7 @@ class DesignAgent:
                 "architecture": arch,
                 "infrastructure_approximation": design_data.get("infrastructure_approximation", default_infrastructure),
                 "similar_projects": design_data.get("similar_projects", default_similar_projects),
-                "complex_diagrams": design_data.get("complex_diagrams", [])
+                "complex_diagrams": design_data.get("complex_diagrams", default_complex_diagrams)
             }
         except Exception as e:
             print(f"Error in Solution Design Agent: {e}")
@@ -123,5 +271,5 @@ class DesignAgent:
                 "architecture": default_architecture,
                 "infrastructure_approximation": default_infrastructure,
                 "similar_projects": default_similar_projects,
-                "complex_diagrams": []
+                "complex_diagrams": default_complex_diagrams
             }

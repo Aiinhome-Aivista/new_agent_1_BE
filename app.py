@@ -11,6 +11,7 @@ load_dotenv(override=True)
 from database.db_connection import init_db, get_db_connection
 import controllers.auth_controller as auth_controller
 import controllers.proposal_controller as proposal_controller
+import controllers.case_study_controller as case_study_controller
 
 app = Flask(__name__)
 # Enable CORS for React dev server (usually localhost:5173)
@@ -71,6 +72,20 @@ def login():
 @require_role('presales', 'bidmanager', 'admin')
 def upload_proposal():
     return proposal_controller.upload_proposal()
+
+@app.route('/api/case-studies/upload', methods=['POST'])
+@require_role('presales', 'admin')
+def upload_case_study():
+    return case_study_controller.upload_case_study()
+
+@app.route('/api/case-studies', methods=['GET'])
+def get_case_studies():
+    return case_study_controller.get_case_studies()
+
+@app.route('/api/case-studies/<id>', methods=['DELETE'])
+@require_role('presales', 'admin')
+def delete_case_study(id):
+    return case_study_controller.delete_case_study(id)
 
 @app.route('/api/proposals', methods=['GET'])
 def get_proposals_list():

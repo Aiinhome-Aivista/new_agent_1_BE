@@ -47,6 +47,19 @@ def upload_proposal():
                     "original_name": file.filename,
                     "saved_path": save_path
                 })
+                
+        # Parse case study files if any
+        uploaded_case_study_files = []
+        case_study_files = request.files.getlist("case_study_files")
+        for file in case_study_files:
+            if file.filename:
+                safe_name = f"{uuid.uuid4()}_{file.filename}"
+                save_path = os.path.join(upload_dir, safe_name)
+                file.save(save_path)
+                uploaded_case_study_files.append({
+                    "original_name": file.filename,
+                    "saved_path": save_path
+                })
         
         proposal_id = str(uuid.uuid4())[:8] # Short unique ID
         
@@ -68,7 +81,8 @@ def upload_proposal():
             project_duration=project_duration,
             budget=budget,
             files_info=uploaded_files,
-            requirements_text=requirements_text
+            requirements_text=requirements_text,
+            case_study_files=uploaded_case_study_files
         )
         
         return jsonify({
