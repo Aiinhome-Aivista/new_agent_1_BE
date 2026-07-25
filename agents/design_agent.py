@@ -39,7 +39,7 @@ class DesignAgent:
                 "3. Choose the best, most compliant option, and render it into the final output format.\n\n"
                 "Your response must ONLY be a JSON object with these keys:\n"
                 "- 'business_summary': a highly detailed and convenient 3-paragraph string summarizing the proposed solution, clearly articulating strategic and operational benefits.\n"
-                "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (sentence detail).\n"
+                "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (a moderately detailed paragraph of about 4 to 5 sentences explaining the pillar so the reader understands it well without overflowing the presentation slide).\n"
                 "- 'data_flow': a list of exactly 4 strings representing the high-level data flow steps.\n"
                 "- 'architecture': a list of exactly 3 layers (e.g. 'Presentation layer (UI Client)', "
                 "'Application Logic (API Backend)', 'Data Integration & Cache Layer') where each layer object contains "
@@ -55,9 +55,9 @@ class DesignAgent:
         chain = tot_prompt | self.llm_json
         
         default_pillars = [
-            {"title": "Agentic Orchestrator Engine", "desc": "Implement a stateful multi-agent orchestrator utilizing ReAct patterns to parse proposals asynchronously."},
-            {"title": "Responsive Web Dashboard", "desc": f"Deliver an intuitive dashboard built with {ui_tech}, offering real-time progress steps and inline document editing."},
-            {"title": "Deterministic Presentation Engine", "desc": f"Compile agent decisions into a clean JSON IR, and render a pixel-perfect PPTX deck using {backend_tech}."}
+            {"title": "Agentic Orchestrator Engine", "desc": "Implement a stateful multi-agent orchestrator utilizing ReAct patterns to parse proposals asynchronously. This ensures that every step of the process is handled efficiently, reducing manual intervention and increasing overall accuracy and speed of delivery."},
+            {"title": "Responsive Web Dashboard", "desc": f"Deliver an intuitive dashboard built with {ui_tech}, offering real-time progress steps and inline document editing. The interface is highly responsive and user-friendly, allowing stakeholders to easily track milestones, review documents, and collaborate seamlessly in real time."},
+            {"title": "Deterministic Presentation Engine", "desc": f"Compile agent decisions into a clean JSON IR, and render a pixel-perfect PPTX deck using {backend_tech}. This automated generation process eliminates human error in formatting, ensuring that the final output is always highly professional, consistent, and ready for executive review."}
         ]
         default_architecture = [
             {"name": "Presentation layer (UI Client)", "components": [f"{ui_tech} SPA", "State Management", "Axios Client"]},
