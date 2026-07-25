@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS proposals (
     last_transitioned_at TIMESTAMP NULL,       -- When the last business transition happened
     generated_file_path VARCHAR(500) NULL,
     structured_json_ir LONGTEXT NULL,
+    files_info LONGTEXT NULL,
+    requirements_text LONGTEXT NULL,
+    case_study_files LONGTEXT NULL,
+    draft_ir LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

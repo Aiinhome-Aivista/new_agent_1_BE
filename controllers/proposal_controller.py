@@ -160,6 +160,38 @@ def get_proposal_status(proposal_id):
     except Exception as e:
         return jsonify({"error": f"Error retrieving job status: {str(e)}"}), 500
 
+def resume_proposal_job(proposal_id):
+    """Resumes a failed or pending proposal orchestration."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files FROM proposals WHERE id = %s", (proposal_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if not row:
+            return jsonify({"error": "Proposal not found"}), 404
+            
+        client_name = row.get("client_name") if isinstance(row, dict) else row[0]
+        project_duration = row.get("project_duration") if isinstance(row, dict) else row[1]
+        budget = row.get("budget") if isinstance(row, dict) else row[2]
+        files_info_str = row.get("files_info") if isinstance(row, dict) else row[3]
+        requirements_text = row.get("requirements_text") if isinstance(row, dict) else row[4]
+        case_study_files_str = row.get("case_study_files") if isinstance(row, dict) else row[5]
+
+        files_info = json.loads(files_info_str) if files_info_str else []
+        case_study_files = json.loads(case_study_files_str) if case_study_files_str else []
+
+        # Assuming we need to import run_orchestration here or it's already imported
+        # Wait, trigger_proposal_job triggers the thread, we should use a similar trigger_resume_job
+        from agents.orchestrator import trigger_resume_job
+        trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files)
+        
+        return jsonify({"message": "Job resumed successfully.", "proposal_id": proposal_id}), 200
+    except Exception as e:
+        return jsonify({"error": f"Error resuming job: {str(e)}"}), 500
+
 def edit_proposal_ir(proposal_id):
     """Saves updated JSON IR, then deterministically regenerates the PPTX file (HITL workflow)."""
     try:
