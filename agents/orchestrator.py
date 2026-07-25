@@ -613,7 +613,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         update_step_status(proposal_id, "Assembling", "running", "Assembling final proposal content and running Reflexion quality checks...")
         
         draft_ir = {
-            "proposal_title": f"Autonomous Proposal Document Creator Platform for {client_name}",
+            "proposal_title": "Autonomous Proposal Document Creator Platform",
             "client_name": client_name,
             "project_duration": project_duration,
             "budget": budget,

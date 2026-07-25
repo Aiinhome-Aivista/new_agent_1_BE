@@ -39,7 +39,7 @@ class DesignAgent:
                 "3. Choose the best, most compliant option, and render it into the final output format.\n\n"
                 "Your response must ONLY be a JSON object with these keys:\n"
                 "- 'business_summary': a highly detailed and convenient 3-paragraph string summarizing the proposed solution, clearly articulating strategic and operational benefits.\n"
-                "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (a moderately detailed paragraph of about 4 to 5 sentences explaining the pillar so the reader understands it well without overflowing the presentation slide).\n"
+                "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (a concise but informative paragraph of exactly 2 to 3 sentences and maximum 40 words explaining the pillar so the reader understands it well without overflowing the presentation slide).\n"
                 "- 'data_flow': a list of exactly 4 strings representing the high-level data flow steps.\n"
                 "- 'architecture': a list of exactly 3 layers (e.g. 'Presentation layer (UI Client)', "
                 "'Application Logic (API Backend)', 'Data Integration & Cache Layer') where each layer object contains "
@@ -56,8 +56,7 @@ class DesignAgent:
                 "  * 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing the technical architecture of that case study.\n"
                 "  * 'tech_architecture_explanation': a list of exactly 3 strings representing concise summaries (1-2 sentences) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting.\n"
                 "  * 'key_technologies': a list of exactly 3-4 technologies used (e.g. ['Snowflake', 'Azure Data Factory']).\n"
-                "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n"
-                "- 'complex_diagrams': a list of exactly 2 complex architecture diagram objects (e.g., 'Reference Architecture' and 'Cloud/Integration Architecture'). Each object must have a 'title' string, and a 'mermaid_code' string representing a valid Mermaid.js flowchart (starting with 'graph LR' for optimal wide-screen presentation slide layout) that describes the architecture in high enterprise detail. Use nested subgraphs (like subgraphs for 'External Sources', 'Ingestion', 'Cloud Platform', 'On-Premises', 'Datamarts', 'Use Cases' or 'Reporting' as appropriate) to create clear enterprise-level logical boundaries. Use database shapes (like '[(Database Name)]') for storage components and connect the components with meaningful directional arrows to show exact data pipelines. Ensure the diagrams are clean, detailed, and professional.\n\n"
+                "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
                 "Do not include any explanation or markdown formatting outside the JSON."
             )),
             ("user", "Requirements:\n{requirements}\n\nBudget: {budget}\nDuration: {duration}\n\nCase Study Documents Text:\n{case_study_text}")
@@ -66,9 +65,9 @@ class DesignAgent:
         chain = tot_prompt | self.llm_json
         
         default_pillars = [
-            {"title": "Agentic Orchestrator Engine", "desc": "Implement a stateful multi-agent orchestrator utilizing ReAct patterns to parse proposals asynchronously. This ensures that every step of the process is handled efficiently, reducing manual intervention and increasing overall accuracy and speed of delivery."},
-            {"title": "Responsive Web Dashboard", "desc": f"Deliver an intuitive dashboard built with {ui_tech}, offering real-time progress steps and inline document editing. The interface is highly responsive and user-friendly, allowing stakeholders to easily track milestones, review documents, and collaborate seamlessly in real time."},
-            {"title": "Deterministic Presentation Engine", "desc": f"Compile agent decisions into a clean JSON IR, and render a pixel-perfect PPTX deck using {backend_tech}. This automated generation process eliminates human error in formatting, ensuring that the final output is always highly professional, consistent, and ready for executive review."}
+            {"title": "Agentic Orchestrator Engine", "desc": "Implement a multi-agent orchestrator utilizing ReAct patterns to parse proposals asynchronously. This ensures each step is handled efficiently, reducing manual intervention."},
+            {"title": "Responsive Web Dashboard", "desc": f"Deliver an intuitive dashboard built with {ui_tech}, offering real-time progress steps and inline document editing. The interface is highly responsive and user-friendly for stakeholders."},
+            {"title": "Deterministic Presentation Engine", "desc": f"Compile agent decisions into a clean JSON IR, and render a pixel-perfect PPTX deck using {backend_tech}. This automated generation eliminates human error in formatting."}
         ]
         default_architecture = [
             {"name": "Presentation layer (UI Client)", "components": [f"{ui_tech} SPA", "State Management", "Axios Client"]},
@@ -259,8 +258,7 @@ class DesignAgent:
                 "data_flow": design_data.get("data_flow", default_data_flow),
                 "architecture": arch,
                 "infrastructure_approximation": design_data.get("infrastructure_approximation", default_infrastructure),
-                "similar_projects": design_data.get("similar_projects", default_similar_projects),
-                "complex_diagrams": design_data.get("complex_diagrams", default_complex_diagrams)
+                "similar_projects": design_data.get("similar_projects", default_similar_projects)
             }
         except Exception as e:
             print(f"Error in Solution Design Agent: {e}")
@@ -270,6 +268,5 @@ class DesignAgent:
                 "data_flow": default_data_flow,
                 "architecture": default_architecture,
                 "infrastructure_approximation": default_infrastructure,
-                "similar_projects": default_similar_projects,
-                "complex_diagrams": default_complex_diagrams
+                "similar_projects": default_similar_projects
             }
