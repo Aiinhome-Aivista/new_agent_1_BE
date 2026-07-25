@@ -522,11 +522,7 @@ def generate_pptx(data, output_path):
     tf = title_box.text_frame
     tf.word_wrap = True
     
-    p_pre = tf.paragraphs[0]
-    p_pre.text = "IT SOLUTION PROPOSAL"
-    set_font(p_pre.runs[0], size=14, bold=True, color=GOLD)
-    
-    p_main = tf.add_paragraph()
+    p_main = tf.paragraphs[0]
     p_main.text = safe_text(data.get("proposal_title", "Autonomous Solution Design"))
     set_font(p_main.runs[0], size=36, bold=True, color=WHITE)
     
@@ -550,6 +546,7 @@ def generate_pptx(data, output_path):
         if paragraph.strip():
             p_sum = tf_sum.add_paragraph()
             p_sum.text = safe_text(paragraph.strip())
+            p_sum.alignment = PP_ALIGN.JUSTIFY
             set_font(p_sum.runs[0], size=14, color=CHARCOAL)
             p_sum.space_after = Pt(14)
 
@@ -561,23 +558,20 @@ def generate_pptx(data, output_path):
     add_footer(slide)
 
     # Requirements list (Left panel)
-    req_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(1.3), Inches(4.3), Inches(5.5))
-    req_box.fill.solid()
-    req_box.fill.fore_color.rgb = OFF_WHITE
-    req_box.line.color.rgb = CHARCOAL
-    req_box.line.width = Pt(1)
     
-    req_title = slide.shapes.add_textbox(Inches(0.6), Inches(1.4), Inches(4.1), Inches(5.2))
+    req_title = slide.shapes.add_textbox(Inches(0.6), Inches(1.4), Inches(8.8), Inches(5.2))
     tf_req = req_title.text_frame
     tf_req.word_wrap = True
     p = tf_req.paragraphs[0]
     p.text = "Key Client Requirements:"
     set_font(p.runs[0], size=14, bold=True, color=ORANGE)
+    p.space_after = Pt(12)
     
     for req in data.get("requirements", ["No requirements specified"]):
         p_item = tf_req.add_paragraph()
         p_item.text = f"• {safe_text(req)}"
-        set_font(p_item.runs[0], size=11, color=CHARCOAL)
+        set_font(p_item.runs[0], size=12, color=CHARCOAL)
+        p_item.space_after = Pt(10)
 
     # ----------------------------------------------------
     # SLIDE 3: Capability Gaps & Mitigations
@@ -586,11 +580,7 @@ def generate_pptx(data, output_path):
     create_slide_header(slide, "Capability Gaps & Mitigations", "Identified gaps against RFP requirements and proposed mitigations")
     add_footer(slide)
 
-    gap_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(1.3), Inches(9.0), Inches(5.5))
-    gap_box.fill.solid()
-    gap_box.fill.fore_color.rgb = OFF_WHITE
-    gap_box.line.color.rgb = CHARCOAL
-    gap_box.line.width = Pt(1)
+
 
     gap_title = slide.shapes.add_textbox(Inches(0.6), Inches(1.4), Inches(8.8), Inches(5.2))
     tf_gap = gap_title.text_frame
@@ -598,11 +588,13 @@ def generate_pptx(data, output_path):
     p_gap = tf_gap.paragraphs[0]
     p_gap.text = "Capability Gaps & Mitigations:"
     set_font(p_gap.runs[0], size=14, bold=True, color=RED)
+    p_gap.space_after = Pt(12)
 
     for gap in data.get("gaps", ["No gaps identified"]):
         p_item = tf_gap.add_paragraph()
         p_item.text = f"• {safe_text(gap)}"
-        set_font(p_item.runs[0], size=11, color=CHARCOAL)
+        set_font(p_item.runs[0], size=12, color=CHARCOAL)
+        p_item.space_after = Pt(10)
 
     # ----------------------------------------------------
     # SLIDE 3: Solution Approach & Architecture
@@ -625,43 +617,55 @@ def generate_pptx(data, output_path):
     for i, pillar in enumerate(pillars[:3]):
         left = start_left + i * (width_pillar + gap_pillar)
         
-        # Pillar Shape
-        p_shape = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, left, Inches(1.8), width_pillar, Inches(4.5))
-        p_shape.fill.solid()
-        p_shape.fill.fore_color.rgb = OFF_WHITE
-        p_shape.line.color.rgb = ORANGE
-        p_shape.line.width = Pt(2)
+        # Pillar Title Box (no background fill)
+        t_box = slide.shapes.add_textbox(left, Inches(1.8), width_pillar, Inches(0.6))
+        tf_t = t_box.text_frame
+        tf_t.word_wrap = True
+        p_t = tf_t.paragraphs[0]
+        p_t.alignment = PP_ALIGN.LEFT
+        p_t.text = ""
         
-        # Pillar Number Box
-        n_shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, Inches(1.8), width_pillar, Inches(0.6))
-        n_shape.fill.solid()
-        n_shape.fill.fore_color.rgb = ORANGE
-        n_shape.line.fill.background()
+        # Number Run
+        r_num = p_t.add_run()
+        r_num.text = f"0{i+1}. "
+        set_font(r_num, size=14, bold=True, color=ORANGE)
         
-        # Pillar text inside number box
-        p_num = n_shape.text_frame.paragraphs[0]
-        p_num.text = f"0{i+1}. {safe_text(pillar.get('title'))}"
-        p_num.alignment = PP_ALIGN.CENTER
-        set_font(p_num.runs[0], size=12, bold=True, color=WHITE)
+        # Title Run
+        r_title = p_t.add_run()
+        r_title.text = safe_text(pillar.get('title'))
+        set_font(r_title, size=14, bold=True, color=CHARCOAL)
+        
+        # Horizontal Separator Line (Rectangle)
+        hline = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, Inches(2.5), width_pillar, Inches(0.02))
+        hline.fill.solid()
+        hline.fill.fore_color.rgb = ORANGE
+        hline.line.fill.background()
         
         # Pillar Description text box
-        desc_box = slide.shapes.add_textbox(left + Inches(0.1), Inches(2.5), width_pillar - Inches(0.2), Inches(3.6))
+        desc_box = slide.shapes.add_textbox(left, Inches(2.6), width_pillar, Inches(3.5))
         tf_desc = desc_box.text_frame
         tf_desc.word_wrap = True
         p_desc = tf_desc.paragraphs[0]
         p_desc.text = safe_text(pillar.get("desc", ""))
-        set_font(p_desc.runs[0], size=11, color=CHARCOAL)
+        p_desc.alignment = PP_ALIGN.JUSTIFY
+        set_font(p_desc.runs[0], size=10, color=CHARCOAL)
 
     # ----------------------------------------------------
     # SLIDE 3B: High Level Design: Data Flow (Custom Architecture Diagram)
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
     
-    # Dark background
+    # White background
     bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
     bg.fill.solid()
-    bg.fill.fore_color.rgb = RGBColor(15, 15, 15)
+    bg.fill.fore_color.rgb = WHITE
     bg.line.fill.background()
+
+    # Black Header
+    hdr_bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(1.2))
+    hdr_bg.fill.solid()
+    hdr_bg.fill.fore_color.rgb = RGBColor(15, 15, 15)
+    hdr_bg.line.fill.background()
     
     # Title
     title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.2), Inches(9), Inches(0.8))
@@ -675,32 +679,36 @@ def generate_pptx(data, output_path):
         num_items = len(data_flow_items)
         
         # Calculate available height
-        start_top = 1.2
+        start_top = 1.5
         end_bottom = 7.0
         total_avail = end_bottom - start_top
         
         arrow_h = 0.3
         
-        # Calculate dynamic box height to fit all items perfectly
+        # Calculate dynamic box height, cap it so it doesn't get too thick
         box_h = (total_avail - ((num_items - 1) * arrow_h)) / num_items
-        
-        # Fallback if too many items
+        if box_h > 0.9:
+            box_h = 0.9
         if box_h < 0.4:
             box_h = 0.4
             arrow_h = 0.1
             
-        current_top = start_top
+        total_block_height = (box_h * num_items) + (arrow_h * (num_items - 1))
+        current_top = start_top + (total_avail - total_block_height) / 2
+        
+        box_width = 8.0
+        box_left = 1.0
         
         for i, item_text in enumerate(data_flow_items):
             # Draw Box
-            box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(current_top), Inches(9.0), Inches(box_h))
+            box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(box_left), Inches(current_top), Inches(box_width), Inches(box_h))
             box.fill.solid()
             box.fill.fore_color.rgb = RGBColor(30, 30, 30)
             box.line.color.rgb = RGBColor(120, 120, 120)
             box.line.width = Pt(1.5)
             
             # Text inside box
-            tb = slide.shapes.add_textbox(Inches(0.6), Inches(current_top), Inches(8.8), Inches(box_h))
+            tb = slide.shapes.add_textbox(Inches(box_left + 0.1), Inches(current_top), Inches(box_width - 0.2), Inches(box_h))
             tf = tb.text_frame
             tf.word_wrap = True
             try:
@@ -856,7 +864,8 @@ def generate_pptx(data, output_path):
     enforced_names = ["Design & Planning", "Development", "Testing", "Deployment", "Training"]
 
     for i, phase in enumerate(phases[:5]):
-        top = Inches(1.5 + (i * 1.1))
+        top_val = 1.35 + (i * 1.12)
+        top = Inches(top_val)
         
         # Enforce exact phase name
         if i < len(enforced_names):
@@ -865,7 +874,7 @@ def generate_pptx(data, output_path):
             phase_name = safe_text(phase.get("phase", ""))
         
         # Chevron Phase Box
-        c_shape = slide.shapes.add_shape(MSO_SHAPE.CHEVRON, Inches(0.5), top, Inches(3.2), Inches(0.9))
+        c_shape = slide.shapes.add_shape(MSO_SHAPE.CHEVRON, Inches(0.5), Inches(top_val + 0.1), Inches(3.2), Inches(0.85))
         c_shape.fill.solid()
         c_shape.fill.fore_color.rgb = ORANGE
         c_shape.line.fill.background()
@@ -879,7 +888,7 @@ def generate_pptx(data, output_path):
         set_font(p_c.runs[0], size=11, bold=True, color=WHITE)
 
         # Description / Deliverables Box next to the Chevron
-        d_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(4.0), top, Inches(5.5), Inches(1.3))
+        d_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(4.0), top, Inches(5.5), Inches(1.05))
         d_box.fill.solid()
         d_box.fill.fore_color.rgb = OFF_WHITE
         d_box.line.color.rgb = CHARCOAL
@@ -893,7 +902,7 @@ def generate_pptx(data, output_path):
         
         p_d_desc = tf_d.add_paragraph()
         p_d_desc.text = safe_text(phase.get("deliverables", ""))
-        set_font(p_d_desc.runs[0], size=10, color=CHARCOAL)
+        set_font(p_d_desc.runs[0], size=9, color=CHARCOAL)
 
     # ----------------------------------------------------
     # SLIDE 5B: Case Study
@@ -1218,6 +1227,153 @@ def generate_pptx(data, output_path):
             set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
     # ----------------------------------------------------
+    # DYNAMIC COMPLEX ARCHITECTURE DIAGRAMS
+    # ----------------------------------------------------
+    complex_diagrams = data.get("complex_diagrams", [])
+    for diag in complex_diagrams:
+        slide = prs.slides.add_slide(blank_slide_layout)
+        
+        # Background
+        bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
+        bg.fill.solid()
+        bg.fill.fore_color.rgb = RGBColor(248, 249, 250)
+        bg.line.fill.background()
+        
+        create_slide_header(slide, safe_text(diag.get("title", "Architecture Diagram")), "Dynamic Architecture generated from AI Payload")
+        add_footer(slide)
+        
+        columns = diag.get("columns", [])
+        if not columns:
+            continue
+            
+        # Total width ratios
+        total_ratio = sum(col.get("width_ratio", 1.0) for col in columns)
+        
+        # Working area: Left 0.5, Right 9.5 -> width = 9.0
+        # Top 1.2, Bottom 6.8 -> height = 5.6
+        avail_width = 9.0
+        start_x = 0.5
+        
+        for col_idx, col in enumerate(columns):
+            ratio = col.get("width_ratio", 1.0)
+            col_width = (ratio / total_ratio) * avail_width
+
+            # Draw Column Header
+            c_header = slide.shapes.add_textbox(Inches(start_x), Inches(1.0), Inches(col_width - 0.3), Inches(0.4))
+            p_ch = c_header.text_frame.paragraphs[0]
+            p_ch.text = safe_text(col.get("name", ""))
+            p_ch.alignment = PP_ALIGN.CENTER
+            set_font(p_ch.runs[0], size=12, bold=True, color=CHARCOAL)
+            
+            zones = col.get("zones", [])
+            if zones:
+                zone_h = 5.4 / len(zones)
+                current_y = 1.4
+                
+                for zone in zones:
+                    bg_color_str = zone.get("bg_color", "transparent")
+                    if bg_color_str == "light_green":
+                        fill_color = RGBColor(220, 235, 200)
+                    elif bg_color_str == "light_grey":
+                        fill_color = RGBColor(230, 230, 230)
+                    elif bg_color_str == "light_blue":
+                        fill_color = RGBColor(210, 230, 250)
+                    elif bg_color_str == "white":
+                        fill_color = RGBColor(255, 255, 255)
+                    else:
+                        fill_color = None
+                        
+                    if fill_color:
+                        z_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(start_x), Inches(current_y), Inches(col_width - 0.3), Inches(zone_h - 0.1))
+                        z_box.fill.solid()
+                        z_box.fill.fore_color.rgb = fill_color
+                        z_box.line.color.rgb = GREY
+                        z_box.line.width = Pt(1)
+                    else:
+                        # transparent dashed border
+                        z_box = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(start_x), Inches(current_y), Inches(col_width - 0.3), Inches(zone_h - 0.1))
+                        z_box.fill.background()
+                        z_box.line.color.rgb = GREY
+                        z_box.line.width = Pt(1)
+                        # dash_style 2 is dashed
+                        try:
+                            z_box.line.dash_style = 2
+                        except:
+                            pass
+                    
+                    # Zone Title
+                    z_title = slide.shapes.add_textbox(Inches(start_x), Inches(current_y), Inches(col_width - 0.3), Inches(0.3))
+                    p_zt = z_title.text_frame.paragraphs[0]
+                    p_zt.text = safe_text(zone.get("name", ""))
+                    set_font(p_zt.runs[0], size=10, bold=True, color=CHARCOAL)
+                    
+                    items = zone.get("items", [])
+                    if items:
+                        # simple vertical or 2x2 grid
+                        cols_grid = 2 if len(items) > 3 else 1
+                        
+                        if cols_grid == 1:
+                            item_w = col_width - 0.2
+                            margin_l = 0.1
+                            gap_x = 0
+                        else:
+                            item_w = (col_width - 0.25) / cols_grid
+                            margin_l = 0.08
+                            gap_x = 0.09
+                        
+                        rows = (len(items) + cols_grid - 1) // cols_grid
+                        available_h = zone_h - 0.4
+                        if available_h < 0.2: available_h = 0.2
+                        item_h = available_h / rows - 0.1
+                        if item_h > 0.6: item_h = 0.6
+                        
+                        for idx, item in enumerate(items):
+                            r = idx // cols_grid
+                            c = idx % cols_grid
+                            ix = start_x + margin_l + (c * (item_w + gap_x))
+                            iy = current_y + 0.35 + (r * (item_h + 0.1))
+                            
+                            shape_type_str = item.get("shape", "box")
+                            if shape_type_str == "database":
+                                stype = MSO_SHAPE.CAN
+                            elif shape_type_str == "cloud":
+                                stype = MSO_SHAPE.CLOUD
+                            else:
+                                stype = MSO_SHAPE.ROUNDED_RECTANGLE
+                                
+                            item_box = slide.shapes.add_shape(stype, Inches(ix), Inches(iy), Inches(item_w), Inches(item_h))
+                            item_box.fill.solid()
+                            item_box.fill.fore_color.rgb = WHITE
+                            item_box.line.color.rgb = ORANGE
+                            item_box.line.width = Pt(1.5)
+                            
+                            # Item Text
+                            tf = item_box.text_frame
+                            tf.word_wrap = True
+                            tf.margin_left = Inches(0.02)
+                            tf.margin_right = Inches(0.02)
+                            tf.margin_top = Inches(0.02)
+                            tf.margin_bottom = Inches(0.02)
+                            pit = tf.paragraphs[0]
+                            pit.text = safe_text(item.get("name", ""))
+                            pit.alignment = PP_ALIGN.CENTER
+                            fsize = 6.5 if cols_grid == 2 else 8
+                            set_font(pit.runs[0], size=fsize, bold=True, color=CHARCOAL)
+                            
+                            # Add an arrow to the right of the item if it's not the last column
+                            # and it's the rightmost item in the grid cell
+                            if col_idx < len(columns) - 1 and (c == cols_grid - 1 or len(items) == 1):
+                                item_right = ix + item_w
+                                arr = slide.shapes.add_shape(MSO_SHAPE.RIGHT_ARROW, Inches(item_right + 0.05), Inches(iy + item_h/2 - 0.05), Inches(0.2), Inches(0.1))
+                                arr.fill.solid()
+                                arr.fill.fore_color.rgb = ORANGE
+                                arr.line.color.rgb = CHARCOAL
+                            
+                    current_y += zone_h
+            
+            start_x += col_width
+
+    # ----------------------------------------------------
     # HARDCODED "SAME TO SAME" ARCHITECTURE DIAGRAMS
     # ----------------------------------------------------
     # Slide 8: Reference Architecture
@@ -1231,6 +1387,22 @@ def generate_pptx(data, output_path):
 
 
 
+
+    # Slide 10: Thank You Slide
+    thank_you_slide = prs.slides.add_slide(blank_slide_layout)
+    
+    # White background for a clean finish
+    bg_ty = thank_you_slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0), Inches(0), Inches(10), Inches(7.5))
+    bg_ty.fill.solid()
+    bg_ty.fill.fore_color.rgb = WHITE
+    bg_ty.line.fill.background()
+
+    # "Thank You" Main Text
+    ty_box = thank_you_slide.shapes.add_textbox(Inches(0), Inches(3.0), Inches(10), Inches(1.5))
+    p_ty = ty_box.text_frame.paragraphs[0]
+    p_ty.text = "Thank You"
+    p_ty.alignment = PP_ALIGN.CENTER
+    set_font(p_ty.runs[0], size=72, bold=True, color=ORANGE)
 
     # Save presentation
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

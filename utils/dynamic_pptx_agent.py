@@ -41,21 +41,9 @@ def create_title_slide() -> str:
     tf = title_box.text_frame
     tf.word_wrap = True
     
-    p_pre = tf.paragraphs[0]
-    p_pre.text = "IT SOLUTION PROPOSAL"
-    set_font(p_pre.runs[0], size=14, bold=True, color=GOLD)
-    
-    p_main = tf.add_paragraph()
+    p_main = tf.paragraphs[0]
     p_main.text = safe_text(_data.get("proposal_title", "Autonomous Solution Design"))
     set_font(p_main.runs[0], size=36, bold=True, color=WHITE)
-    
-    p_sub = tf.add_paragraph()
-    p_sub.text = f"Prepared for: {safe_text(_data.get('client_name', 'Enterprise Client'))}"
-    set_font(p_sub.runs[0], size=18, color=LIGHT_GREY)
-    
-    p_meta = tf.add_paragraph()
-    p_meta.text = f"\nTimeline: {safe_text(_data.get('project_duration', 'N/A'))}  |  Target Budget: {safe_text(_data.get('budget', 'N/A'))}\nDraft Date: Current"
-    set_font(p_meta.runs[0], size=11, color=ORANGE)
     return "Title slide created successfully."
 
 @tool
@@ -76,6 +64,7 @@ def create_business_summary_slide() -> str:
         if paragraph.strip():
             p_sum = tf_sum.add_paragraph()
             p_sum.text = safe_text(paragraph.strip())
+            p_sum.alignment = PP_ALIGN.JUSTIFY
             set_font(p_sum.runs[0], size=14, color=CHARCOAL)
             p_sum.space_after = Pt(14)
     return "Business summary slide created successfully."
@@ -90,11 +79,6 @@ def create_gap_analysis_slide() -> str:
     add_footer(slide)
 
     # Requirements list (Left panel)
-    req_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.5), Inches(1.3), Inches(4.3), Inches(5.5))
-    req_box.fill.solid()
-    req_box.fill.fore_color.rgb = OFF_WHITE
-    req_box.line.color.rgb = CHARCOAL
-    req_box.line.width = Pt(1)
     
     req_title = slide.shapes.add_textbox(Inches(0.6), Inches(1.4), Inches(4.1), Inches(5.2))
     tf_req = req_title.text_frame
@@ -109,11 +93,6 @@ def create_gap_analysis_slide() -> str:
         set_font(p_item.runs[0], size=11, color=CHARCOAL)
 
     # Gaps and Matches (Right panel)
-    gap_box = slide.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(5.2), Inches(1.3), Inches(4.3), Inches(5.5))
-    gap_box.fill.solid()
-    gap_box.fill.fore_color.rgb = OFF_WHITE
-    gap_box.line.color.rgb = CHARCOAL
-    gap_box.line.width = Pt(1)
 
     gap_title = slide.shapes.add_textbox(Inches(5.3), Inches(1.4), Inches(4.1), Inches(5.2))
     tf_gap = gap_title.text_frame
