@@ -38,7 +38,7 @@ class DesignAgent:
                 "2. Evaluate each candidate's development cost, delivery risk, scalability, and alignment with the timeline.\n"
                 "3. Choose the best, most compliant option, and render it into the final output format.\n\n"
                 "Your response must ONLY be a JSON object with these keys:\n"
-                "- 'business_summary': a highly detailed and convenient 3-paragraph string summarizing the proposed solution, clearly articulating strategic and operational benefits.\n"
+                "- 'business_summary': a highly detailed and convenient 3-paragraph string summarizing the proposed solution. It MUST explicitly state why this project is being implemented and clearly articulate the strategic business benefits and advantages (e.g., ROI, operational efficiency, competitive advantage) of implementing it.\n"
                 "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (a concise but informative paragraph of exactly 2 to 3 sentences and maximum 40 words explaining the pillar so the reader understands it well without overflowing the presentation slide).\n"
                 "- 'data_flow': a list of exactly 4 strings representing the high-level data flow steps.\n"
                 "- 'architecture': a list of exactly 3 layers (e.g. 'Presentation layer (UI Client)', "
@@ -74,7 +74,7 @@ class DesignAgent:
             {"name": "Application Logic (API Backend)", "components": [f"{backend_tech} Web Service", "Agent Control Loop", "Auth Middleware"]},
             {"name": "Data Integration & Cache Layer", "components": [f"{db_tech} Database", "python-pptx Builder", "Semantic RAG Store"]}
         ]
-        default_business_summary = "This proposal outlines a state-of-the-art solution designed to address your key requirements by leveraging modern cloud and AI capabilities.\n\nOur approach ensures scalability, security, and rapid time-to-market, minimizing risks while maximizing operational efficiency."
+        default_business_summary = "This project is being implemented to address critical operational bottlenecks and modernize our technological infrastructure, ensuring we remain competitive in a rapidly evolving market.\\n\\nThis proposal outlines a state-of-the-art solution designed to address these requirements by leveraging modern cloud and AI capabilities. Implementing this solution will drive significant business benefits, including reduced time-to-market, maximized operational efficiency, and a strong foundation for future scalable growth."
         default_data_flow = [
             "1. User securely inputs requirements via React Dashboard.",
             "2. Orchestrator triggers Python agents to analyze and query Vector DB.",

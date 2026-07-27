@@ -245,10 +245,11 @@ WHITE = RGBColor(255, 255, 255)
 GREY = RGBColor(180, 180, 180)
 LIGHT_GREY = RGBColor(240, 240, 240)
 
-def set_font(run, name="Arial", size=14, bold=False, color=CHARCOAL):
+def set_font(run, name="Arial", size=14, bold=False, italic=False, color=CHARCOAL):
     run.font.name = name
     run.font.size = Pt(size)
     run.font.bold = bold
+    run.font.italic = italic
     run.font.color.rgb = color
 
 def create_slide_header(slide, title_text, subtitle_text=None):
@@ -597,7 +598,33 @@ def generate_pptx(data, output_path):
         p_item.space_after = Pt(10)
 
     # ----------------------------------------------------
-    # SLIDE 3: Solution Approach & Architecture
+    # SLIDE 3A: Capability Gaps & Mitigations (Cont.)
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "Capability Gaps & Mitigations", "Identified gaps against RFP requirements and proposed mitigations")
+    add_footer(slide)
+
+    gap_title_cont = slide.shapes.add_textbox(Inches(0.6), Inches(1.4), Inches(8.8), Inches(5.2))
+    tf_gap_cont = gap_title_cont.text_frame
+    tf_gap_cont.word_wrap = True
+    p_gap_cont = tf_gap_cont.paragraphs[0]
+    p_gap_cont.text = "Capability Gaps & Mitigations:"
+    set_font(p_gap_cont.runs[0], size=14, bold=True, color=RED)
+    p_gap_cont.space_after = Pt(12)
+
+    extra_gaps = [
+        "Identified gap in Client Requirement: 'Security and Data Protection'. Mitigation: Implement enterprise-grade zero-trust architecture, advanced data encryption, RBAC, and continuous threat detection mechanisms.",
+        "Identified gap in Client Requirement: 'System Observability and Monitoring'. Mitigation: Deploy comprehensive distributed tracing, centralized logging, and real-time alerting dashboards across the multi-agent environment."
+    ]
+
+    for gap in extra_gaps:
+        p_item = tf_gap_cont.add_paragraph()
+        p_item.text = f"• {safe_text(gap)}"
+        set_font(p_item.runs[0], size=12, color=CHARCOAL)
+        p_item.space_after = Pt(10)
+
+    # ----------------------------------------------------
+    # SLIDE 4: Solution Approach & Architecture
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
     create_slide_header(slide, "Solution Approach & Architecture", "High-level implementation strategy and operational frameworks")
@@ -1186,6 +1213,15 @@ def generate_pptx(data, output_path):
             p.text = " "
         if p.runs:
             set_font(p.runs[0], size=11, bold=True, color=WHITE)
+
+    # Add Disclaimer below table
+    disclaimer_top = Inches(1.5 + (0.4 * rows) + 0.3)
+    disclaimer_box = slide.shapes.add_textbox(Inches(0.5), disclaimer_top, Inches(9.0), Inches(0.8))
+    tf_disc = disclaimer_box.text_frame
+    tf_disc.word_wrap = True
+    p_disc = tf_disc.paragraphs[0]
+    p_disc.text = "Disclaimer: Please note that this high-level estimate is subject to change as it depends on detailed client requirements. All resource and pricing calculations reflect the median baseline for similar enterprise integrations."
+    set_font(p_disc.runs[0], size=10, italic=True, color=CHARCOAL)
 
     # ----------------------------------------------------
     # SLIDE 7: Required Skills & Competency Matching
