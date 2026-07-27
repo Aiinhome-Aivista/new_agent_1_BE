@@ -1054,7 +1054,8 @@ def generate_pptx(data, output_path):
                 try:
                     temp_img_path = render_mermaid_to_image(mermaid_code)
                     if temp_img_path and os.path.exists(temp_img_path):
-                        add_picture_proportionally(slide, temp_img_path, Inches(5.1), Inches(1.8), Inches(4.3), Inches(1.8))
+                        # Use a fixed dimension to prevent the wide horizontal flowchart from scaling down too small
+                        slide.shapes.add_picture(temp_img_path, Inches(5.1), Inches(1.8), Inches(4.3), Inches(1.7))
                 except Exception as img_e:
                     print(f"Failed to add case study mermaid image: {img_e}")
                     
@@ -1084,7 +1085,22 @@ def generate_pptx(data, output_path):
                 
                 p_s = tf_s.paragraphs[0]
                 p_s.text = safe_text(exp_text)
-                set_font(p_s.runs[0], size=7, color=CHARCOAL)
+                p_s.space_before = Pt(0)
+                p_s.space_after = Pt(0)
+                
+                # Dynamic font sizing based on text length as a fallback to prevent overflow
+                text_len = len(p_s.text)
+                if text_len > 200:
+                    font_size = 5.5
+                    p_s.line_spacing = Pt(6.5)
+                elif text_len > 120:
+                    font_size = 6.2
+                    p_s.line_spacing = Pt(7.2)
+                else:
+                    font_size = 7.0
+                    p_s.line_spacing = Pt(8.5)
+                    
+                set_font(p_s.runs[0], size=font_size, color=CHARCOAL)
                 
             # Right Column Bottom Left: Key Technologies
             tech_header_box = slide.shapes.add_textbox(Inches(5.0), Inches(5.1), Inches(2.2), Inches(0.3))
