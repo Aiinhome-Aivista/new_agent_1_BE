@@ -6,76 +6,177 @@ from database.db_connection import get_db_connection
 from utils.doc_extractor import extract_text
 from utils.llm_client import query_llm
 
+# def upload_case_study():
+#     try:
+#         files = request.files.getlist("files")
+#         if not files or not files[0].filename:
+#             return jsonify({"error": "No file uploaded"}), 400
+            
+#         file = files[0]
+#         upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+#         os.makedirs(upload_dir, exist_ok=True)
+        
+#         safe_name = f"{uuid.uuid4()}_{file.filename}"
+#         save_path = os.path.join(upload_dir, safe_name)
+#         file.save(save_path)
+        
+#         text = extract_text(save_path)
+#         if not text or not text.strip():
+#             return jsonify({"error": "Failed to extract text from file"}), 400
+            
+#         # Call LLM to parse text into rich case study JSON schema
+#         sys_prompt = (
+#             "You are an expert Solutions Architect. Parse the provided case study document text "
+#             "and format it into a structured JSON object representing a detailed case study.\n\n"
+#             "Your response must ONLY be a JSON object with these keys:\n"
+#             "- 'project_name': short name of the project (e.g. 'Teradata to Snowflake migration').\n"
+#             "- 'client_industry': industry/details of the client (e.g. 'Lifestyle Footwear Company in US').\n"
+#             "- 'business_problem': a list of exactly 3-4 strings representing key business/technical challenges.\n"
+#             "- 'our_approach': a list of exactly 3-4 strings detailing the steps or architectural choices built to solve it.\n"
+#             "- 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing the technical architecture.\n"
+#             "- 'tech_architecture_explanation': a list of exactly 3 strings representing concise summaries (1-2 sentences) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting.\n"
+#             "- 'key_technologies': a list of exactly 3-4 technologies used (e.g. ['Snowflake', 'Azure Data Factory']).\n"
+#             "- 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
+#             "Do not include any explanation or markdown formatting outside the JSON."
+#         )
+        
+#         res = query_llm(sys_prompt, text, json_mode=True)
+#         if not res:
+#             return jsonify({"error": "Failed to parse case study with LLM"}), 500
+            
+#         content = res.strip()
+#         if content.startswith("```json"):
+#             content = content[7:]
+#         if content.endswith("```"):
+#             content = content[:-3]
+#         content = content.strip()
+        
+#         parsed_data = json.loads(content)
+        
+#         # Save to knowledge_assets database table
+#         conn = get_db_connection()
+#         cursor = conn.cursor()
+        
+#         name = parsed_data.get("project_name", "Migration Project")
+#         capabilities = ", ".join(parsed_data.get("key_technologies", []))
+        
+#         cursor.execute(
+#             "INSERT INTO knowledge_assets (name, description, category, capabilities) VALUES (%s, %s, %s, %s)",
+#             (name, json.dumps(parsed_data), "Case Study", capabilities)
+#         )
+#         conn.commit()
+#         cursor.close()
+#         conn.close()
+        
+#         return jsonify({
+#             "message": "Case study uploaded and processed successfully",
+#             "project_name": name
+#         }), 200
+        
+#     except Exception as e:
+#         return jsonify({"error": f"Failed to upload case study: {str(e)}"}), 500
+
+
 def upload_case_study():
     try:
         files = request.files.getlist("files")
-        if not files or not files[0].filename:
-            return jsonify({"error": "No file uploaded"}), 400
-            
-        file = files[0]
-        upload_dir = os.path.join(os.getcwd(), 'static', 'uploads')
+
+        if not files:
+            return jsonify({"error": "No files uploaded"}), 400
+
+        upload_dir = os.path.join(os.getcwd(), "static", "uploads")
         os.makedirs(upload_dir, exist_ok=True)
-        
-        safe_name = f"{uuid.uuid4()}_{file.filename}"
-        save_path = os.path.join(upload_dir, safe_name)
-        file.save(save_path)
-        
-        text = extract_text(save_path)
-        if not text or not text.strip():
-            return jsonify({"error": "Failed to extract text from file"}), 400
-            
-        # Call LLM to parse text into rich case study JSON schema
-        sys_prompt = (
-            "You are an expert Solutions Architect. Parse the provided case study document text "
-            "and format it into a structured JSON object representing a detailed case study.\n\n"
-            "Your response must ONLY be a JSON object with these keys:\n"
-            "- 'project_name': short name of the project (e.g. 'Teradata to Snowflake migration').\n"
-            "- 'client_industry': industry/details of the client (e.g. 'Lifestyle Footwear Company in US').\n"
-            "- 'business_problem': a list of exactly 3-4 strings representing key business/technical challenges.\n"
-            "- 'our_approach': a list of exactly 3-4 strings detailing the steps or architectural choices built to solve it.\n"
-            "- 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing the technical architecture.\n"
-            "- 'tech_architecture_explanation': a list of exactly 3 strings representing concise summaries (1-2 sentences) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting.\n"
-            "- 'key_technologies': a list of exactly 3-4 technologies used (e.g. ['Snowflake', 'Azure Data Factory']).\n"
-            "- 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
-            "Do not include any explanation or markdown formatting outside the JSON."
-        )
-        
-        res = query_llm(sys_prompt, text, json_mode=True)
-        if not res:
-            return jsonify({"error": "Failed to parse case study with LLM"}), 500
-            
-        content = res.strip()
-        if content.startswith("```json"):
-            content = content[7:]
-        if content.endswith("```"):
-            content = content[:-3]
-        content = content.strip()
-        
-        parsed_data = json.loads(content)
-        
-        # Save to knowledge_assets database table
+
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        name = parsed_data.get("project_name", "Migration Project")
-        capabilities = ", ".join(parsed_data.get("key_technologies", []))
-        
-        cursor.execute(
-            "INSERT INTO knowledge_assets (name, description, category, capabilities) VALUES (%s, %s, %s, %s)",
-            (name, json.dumps(parsed_data), "Case Study", capabilities)
-        )
+
+        uploaded_projects = []
+
+        for file in files:
+
+            if not file.filename:
+                continue
+
+            safe_name = f"{uuid.uuid4()}_{file.filename}"
+            save_path = os.path.join(upload_dir, safe_name)
+            file.save(save_path)
+
+            text = extract_text(save_path)
+
+            if not text or not text.strip():
+                continue
+
+            sys_prompt = (
+                "You are an expert Solutions Architect. Parse the provided case study document text "
+                "and format it into a structured JSON object representing a detailed case study.\n\n"
+                "Your response must ONLY be a JSON object with these keys:\n"
+                "- project_name\n"
+                "- client_industry\n"
+                "- business_problem\n"
+                "- our_approach\n"
+                "- tech_architecture_mermaid\n"
+                "- tech_architecture_explanation\n"
+                "- key_technologies\n"
+                "- benefits_outcome\n"
+                "Return ONLY JSON."
+            )
+
+            res = query_llm(sys_prompt, text, json_mode=True)
+
+            if not res:
+                continue
+
+            content = res.strip()
+
+            if content.startswith("```json"):
+                content = content[7:]
+
+            if content.endswith("```"):
+                content = content[:-3]
+
+            parsed_data = json.loads(content.strip())
+
+            project_name = parsed_data.get(
+                "project_name",
+                os.path.splitext(file.filename)[0]
+            )
+
+            capabilities = ", ".join(
+                parsed_data.get("key_technologies", [])
+            )
+
+            cursor.execute(
+                """
+                INSERT INTO knowledge_assets
+                (name, description, category, capabilities)
+                VALUES (%s,%s,%s,%s)
+                """,
+                (
+                    project_name,
+                    json.dumps(parsed_data),
+                    "Case Study",
+                    capabilities,
+                ),
+            )
+
+            uploaded_projects.append(project_name)
+
         conn.commit()
+
         cursor.close()
         conn.close()
-        
-        return jsonify({
-            "message": "Case study uploaded and processed successfully",
-            "project_name": name
-        }), 200
-        
-    except Exception as e:
-        return jsonify({"error": f"Failed to upload case study: {str(e)}"}), 500
 
+        return jsonify({
+            "message": f"{len(uploaded_projects)} case studies uploaded successfully.",
+            "projects": uploaded_projects
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": f"Failed to upload case studies: {str(e)}"
+        }), 500
+
+        
 def get_case_studies():
     try:
         conn = get_db_connection()
