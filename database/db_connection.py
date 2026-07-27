@@ -105,9 +105,23 @@ def init_sqlite_db():
         status TEXT NOT NULL DEFAULT 'Ingesting',
         generated_file_path TEXT NULL,
         structured_json_ir TEXT NULL,
+        files_info TEXT NULL,
+        requirements_text TEXT NULL,
+        case_study_files TEXT NULL,
+        draft_ir TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
+    
+    # Dynamically add columns if they don't exist in an existing DB
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN files_info TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN requirements_text TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN case_study_files TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN draft_ir TEXT NULL")
+    except: pass
     
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS knowledge_assets (
@@ -197,6 +211,22 @@ def init_db():
             except mysql.connector.Error as err:
                 if err.errno != 1060:
                     print(f"Migration error (last_transitioned_at): {err}")
+
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN files_info LONGTEXT NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (files_info): {err}")
+
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN requirements_text LONGTEXT NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (requirements_text): {err}")
+
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN case_study_files LONGTEXT NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (case_study_files): {err}")
+
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN draft_ir LONGTEXT NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (draft_ir): {err}")
                     
             conn.commit()
             print("MySQL database initialized successfully.")

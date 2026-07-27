@@ -207,9 +207,21 @@ def safe_json_loads(json_str, fallback):
         print(f"Failed to parse JSON: {e}. Raw content: {json_str}")
         return fallback
 
-def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None):
+def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, resume=False):
     """The full Multi-Agent pipeline, executing step-by-step using LLM and fallback defaults."""
     full_case_study_text = ""
+    completed_steps = set()
+    if resume:
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+            cursor.execute("SELECT step_name, status FROM proposal_steps WHERE proposal_id = %s", (proposal_id,))
+            for r in cursor.fetchall():
+                if (r.get('status') if isinstance(r, dict) else r[1]) == 'completed':
+                    completed_steps.add(r.get('step_name') if isinstance(r, dict) else r[0])
+            cursor.close()
+            conn.close()
+        except: pass
     try:
         # Initialize LangChain Agents
         intake_agent = IntakeAgent()
@@ -408,7 +420,8 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         # ----------------------------------------------------
         # 2. KNOWLEDGE AGENT (LLM Requirement Extraction & RAG mapping)
         # ----------------------------------------------------
-        update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying internal assets repository (RAG)...")
+        if "Analyzing" not in completed_steps:
+            update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying internal assets repository (RAG)...")
         
         # Extract requirements using LangChain RequirementAgent
         requirements = req_agent.extract_requirements(full_document_text)
@@ -454,10 +467,22 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         tb = traceback.format_exc()
         update_proposal_status(proposal_id, "Failed")
         for step in STEPS:
-            update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
+            if step not in completed_steps:
+                update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
 def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, final_budget, selected_rag="", selected_guardrail="", selected_action_engine=""):
     """Phase 2 of Orchestration: Designing, Planning, Assembling, PPTX rendering."""
+    completed_steps = set()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        cursor.execute("SELECT step_name, status FROM proposal_steps WHERE proposal_id = %s", (proposal_id,))
+        for r in cursor.fetchall():
+            if (r.get('status') if isinstance(r, dict) else r[1]) == 'completed':
+                completed_steps.add(r.get('step_name') if isinstance(r, dict) else r[0])
+        cursor.close()
+        conn.close()
+    except: pass
     try:
         # Retrieve the partial state
         conn = get_db_connection()
@@ -512,7 +537,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         # ----------------------------------------------------
         # 3. SOLUTION DESIGN AGENT (Tree-of-Thoughts Architecture)
         # ----------------------------------------------------
-        update_step_status(proposal_id, "Designing", "running", f"Designing technical solution using {ui_tech}, {backend_tech}, {db_tech}...")
+        if "Designing" not in completed_steps:
+            update_step_status(proposal_id, "Designing", "running", f"Designing technical solution using {ui_tech}, {backend_tech}, {db_tech}...")
         
         from agents.design_agent import DesignAgent
         design_agent = DesignAgent()
@@ -538,7 +564,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         # ----------------------------------------------------
         # 4. PLANNING & ESTIMATION AGENT (Timeline & Resourcing)
         # ----------------------------------------------------
-        update_step_status(proposal_id, "Planning", "running", "Calculating resources loading, rates sizing, and deliverables timeline...")
+        if "Planning" not in completed_steps:
+            update_step_status(proposal_id, "Planning", "running", "Calculating resources loading, rates sizing, and deliverables timeline...")
         
         plan_sys_prompt = (
             f"You are a Delivery Manager sizing project delivery. The client's target budget is {budget} "
@@ -610,7 +637,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         # ----------------------------------------------------
         # 5. PROPOSAL ASSEMBLY AGENT (Assembly & Reflexion)
         # ----------------------------------------------------
-        update_step_status(proposal_id, "Assembling", "running", "Assembling final proposal content and running Reflexion quality checks...")
+        if "Assembling" not in completed_steps:
+            update_step_status(proposal_id, "Assembling", "running", "Assembling final proposal content and running Reflexion quality checks...")
         
         draft_ir = {
             "proposal_title": "Autonomous Proposal Document Creator Platform",
@@ -703,7 +731,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         # ----------------------------------------------------
         # 6. PPTX RENDERING (Deterministic PowerPoint generation)
         # ----------------------------------------------------
-        update_step_status(proposal_id, "Complete", "running", "Rendering slides into brand-compliant PowerPoint deliverable...")
+        if "Complete" not in completed_steps:
+            update_step_status(proposal_id, "Complete", "running", "Rendering slides into brand-compliant PowerPoint deliverable...")
         
         out_dir = os.path.join(os.getcwd(), 'static', 'proposals')
         os.makedirs(out_dir, exist_ok=True)
@@ -733,8 +762,17 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         tb = traceback.format_exc()
         update_proposal_status(proposal_id, "Failed")
         for step in STEPS:
-            update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
+            if step not in completed_steps:
+                update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
+
+def trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None):
+    thread = __import__('threading').Thread(
+        target=run_orchestration,
+        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, True)
+    )
+    thread.daemon = True
+    thread.start()
 
 def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None):
     """Triggers the orchestrator thread asynchronously so UI remains non-blocking."""
