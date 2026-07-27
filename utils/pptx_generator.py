@@ -862,7 +862,7 @@ def generate_pptx(data, output_path):
         i_table.columns[1].width = Inches(3.5)
         i_table.columns[2].width = Inches(2.0)
         
-        i_headers = ["Azure Component", "Specification", "Est. Monthly Cost"]
+        i_headers = ["Azure Component", "Specification", "Unit Cost"]
         for j, hdr in enumerate(i_headers):
             cell = i_table.cell(0, j)
             cell.fill.solid()
@@ -874,7 +874,9 @@ def generate_pptx(data, output_path):
             
         for i, item in enumerate(infra_items):
             row_idx = i + 1
-            vals = [item.get("component"), item.get("spec"), str(item.get("estimated_monthly_cost"))]
+            cost_raw = item.get("estimated_monthly_cost")
+            cost_str = f"$ {cost_raw} onwards per hour" if cost_raw is not None else ""
+            vals = [item.get("component"), item.get("spec"), cost_str]
             for j, val in enumerate(vals):
                 cell = i_table.cell(row_idx, j)
                 cell.fill.solid()

@@ -96,7 +96,7 @@ class RequirementAgent:
                 "   - 'name': Clear display name (e.g. 'Option 1: Modern Cross-Platform Mobile (Recommended)'). If the primary technologies in this option were explicitly requested in the document, you MUST append ' (Mentioned in HLA document)' to the name.\n"
                 "   - 'ui': UI / Frontend / Mobile technology slug. MUST NOT BE EMPTY OR NULL.\n"
                 "   - 'backend': Backend technology or API framework slug. MUST NOT BE EMPTY OR NULL.\n"
-                "   - 'database': Database / Datastore / Cache / Warehouse technology slug. MUST NOT BE EMPTY OR NULL.\n"
+                "   - 'database': Database / Datastore / Cache / Warehouse technology slug. MUST NOT BE EMPTY OR NULL. Do NOT append vector database extensions (e.g. 'with_pgvector', 'with_vector_search'); just provide the main database name (e.g. 'postgresql', 'mongodb','mysql','mssql','azure sql').\n"
                 "   - 'other_technologies': List of supporting tools/frameworks\n"
                 "   - 'ai_models': The final sorted list of AI models as instructed above. Otherwise an empty list [].\n"
                 "   - 'rationale': One sentence explaining why this stack is a great fit for the client's requirements and the specific application type.\n"
