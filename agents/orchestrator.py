@@ -120,6 +120,17 @@ def update_proposal_status(proposal_id, status, file_path=None, json_ir=None):
                 (status, proposal_id)
             )
         conn.commit()
+        
+        # Trigger next in queue if status is terminal or waiting
+        if status in ('Complete', 'Failed', 'Paused', 'WaitingForTechSelection', 'WaitingForRateConfirmation'):
+            try:
+                from controllers.proposal_controller import process_next_in_queue
+                process_next_in_queue()
+            except ImportError:
+                pass
+            except Exception as e:
+                print(f"Error triggering next in queue: {e}")
+                
     except Exception as e:
         print(f"Error updating proposal status: {e}")
     finally:
@@ -827,6 +838,72 @@ def trigger_resume_job(proposal_id, client_name, project_duration, budget, files
     )
     thread.daemon = True
     thread.start()
+
+
+def process_next_in_queue():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        
+        # Check active
+        cursor.execute("SELECT COUNT(*) as cnt FROM proposals WHERE status IN ('Ingesting', 'Analyzing', 'Designing', 'Planning', 'Assembling', 'WaitingForRateConfirmation')")
+        row = cursor.fetchone()
+        active_count = row.get('cnt', 0) if isinstance(row, dict) else row[0]
+        
+        if active_count == 0:
+            cursor.execute("SELECT id FROM proposals WHERE status = 'Queued' ORDER BY created_at ASC LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                next_id = row.get('id') if isinstance(row, dict) else row[0]
+                cursor.execute("UPDATE proposals SET status = 'Ingesting' WHERE id = %s", (next_id,))
+                conn.commit()
+                # Trigger it
+                import threading
+                threading.Thread(target=trigger_next_job_async, args=(next_id,)).start()
+        
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print('Error processing next in queue:', e)
+
+def trigger_next_job_async(proposal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if row:
+            import json
+            client_name = row.get('client_name') if isinstance(row, dict) else row[0]
+            project_duration = row.get('project_duration') if isinstance(row, dict) else row[1]
+            budget = row.get('budget') if isinstance(row, dict) else row[2]
+            
+            f_info = row.get('files_info') if isinstance(row, dict) else row[3]
+            files_info = json.loads(f_info) if f_info else []
+            
+            r_text = row.get('requirements_text') if isinstance(row, dict) else row[4]
+            
+            c_info = row.get('case_study_files') if isinstance(row, dict) else row[5]
+            case_study_files = json.loads(c_info) if c_info else []
+            
+            p_temp = row.get('ppt_template_file') if isinstance(row, dict) else row[6]
+            
+            trigger_proposal_job(
+                proposal_id=proposal_id,
+                client_name=client_name,
+                project_duration=project_duration,
+                budget=budget,
+                files_info=files_info,
+                requirements_text=r_text,
+                case_study_files=case_study_files,
+                ppt_template_path=p_temp
+            )
+    except Exception as e:
+        print('Error in trigger_next_job_async:', e)
+
 
 def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None):
     """Triggers the orchestrator thread asynchronously so UI remains non-blocking."""

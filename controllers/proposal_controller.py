@@ -75,27 +75,38 @@ def upload_proposal():
         # Save to main proposals table
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Check if there is an active proposal
+        cursor.execute("SELECT COUNT(*) FROM proposals WHERE status IN ('Ingesting', 'Analyzing', 'Designing', 'Planning', 'Assembling', 'WaitingForRateConfirmation')")
+        active_count = cursor.fetchone()[0]
+        status = "Queued" if active_count > 0 else "Ingesting"
+
         cursor.execute(
-            "INSERT INTO proposals (id, client_name, project_duration, budget, status) VALUES (%s, %s, %s, %s, %s)",
-            (proposal_id, client_name, project_duration, budget, "Ingesting")
+            "INSERT INTO proposals (id, client_name, project_duration, budget, status, files_info, requirements_text, case_study_files, ppt_template_file) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (proposal_id, client_name, project_duration, budget, status, json.dumps(uploaded_files), requirements_text, json.dumps(uploaded_case_study_files), ppt_template_path)
         )
         conn.commit()
         cursor.close()
         conn.close()
         
-        # Start async agent job
-        trigger_proposal_job(
-            proposal_id=proposal_id,
-            client_name=client_name,
-            project_duration=project_duration,
-            budget=budget,
-            files_info=uploaded_files,
-            requirements_text=requirements_text,
-            case_study_files=uploaded_case_study_files
-        )
-        
+        if status == "Ingesting":
+            # Start async agent job
+            trigger_proposal_job(
+                proposal_id=proposal_id,
+                client_name=client_name,
+                project_duration=project_duration,
+                budget=budget,
+                files_info=uploaded_files,
+                requirements_text=requirements_text,
+                case_study_files=uploaded_case_study_files,
+                ppt_template_path=ppt_template_path
+            )
+            msg = "Proposal generation job triggered successfully"
+        else:
+            msg = "Proposal added to queue"
+
         return jsonify({
-            "message": "Proposal generation job triggered successfully",
+            "message": msg,
             "proposal_id": proposal_id
         }), 202
         
@@ -169,6 +180,84 @@ def get_proposal_status(proposal_id):
     except Exception as e:
         return jsonify({"error": f"Error retrieving job status: {str(e)}"}), 500
 
+
+def pause_proposal_job(proposal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE proposals SET status = 'Paused' WHERE id = %s", (proposal_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        process_next_in_queue()
+        return jsonify({"message": "Proposal paused successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to pause: {str(e)}"}), 500
+
+def process_next_in_queue():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        # Check if anything is running
+        cursor.execute("SELECT COUNT(*) as cnt FROM proposals WHERE status IN ('Ingesting', 'Analyzing', 'Designing', 'Planning', 'Assembling', 'WaitingForRateConfirmation')")
+        row = cursor.fetchone()
+        active_count = row.get('cnt', 0) if isinstance(row, dict) else row[0]
+        
+        if active_count == 0:
+            cursor.execute("SELECT id FROM proposals WHERE status = 'Queued' ORDER BY created_at ASC LIMIT 1")
+            row = cursor.fetchone()
+            if row:
+                next_id = row.get('id') if isinstance(row, dict) else row[0]
+                cursor.execute("UPDATE proposals SET status = 'Ingesting' WHERE id = %s", (next_id,))
+                conn.commit()
+                # Trigger it
+                import threading
+                threading.Thread(target=trigger_next_job_async, args=(next_id,)).start()
+        
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print('Error processing next in queue:', e)
+
+def trigger_next_job_async(proposal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if row:
+            import json
+            client_name = row.get('client_name') if isinstance(row, dict) else row[0]
+            project_duration = row.get('project_duration') if isinstance(row, dict) else row[1]
+            budget = row.get('budget') if isinstance(row, dict) else row[2]
+            
+            f_info = row.get('files_info') if isinstance(row, dict) else row[3]
+            files_info = json.loads(f_info) if f_info else []
+            
+            r_text = row.get('requirements_text') if isinstance(row, dict) else row[4]
+            
+            c_info = row.get('case_study_files') if isinstance(row, dict) else row[5]
+            case_study_files = json.loads(c_info) if c_info else []
+            
+            p_temp = row.get('ppt_template_file') if isinstance(row, dict) else row[6]
+            
+            trigger_proposal_job(
+                proposal_id=proposal_id,
+                client_name=client_name,
+                project_duration=project_duration,
+                budget=budget,
+                files_info=files_info,
+                requirements_text=r_text,
+                case_study_files=case_study_files,
+                ppt_template_path=p_temp
+            )
+    except Exception as e:
+        print('Error in trigger_next_job_async:', e)
+
 def resume_proposal_job(proposal_id):
     """Resumes a failed or pending proposal orchestration."""
     try:
@@ -199,8 +288,15 @@ def resume_proposal_job(proposal_id):
         pt_row = cursor.fetchone()
         ppt_template_path = pt_row[0] if pt_row else None
         cursor.close()
+
+        # Pause any active proposals
+        cursor = conn.cursor()
+        cursor.execute("UPDATE proposals SET status = 'Paused' WHERE status IN ('Ingesting', 'Analyzing', 'Designing', 'Planning', 'Assembling', 'WaitingForRateConfirmation') AND id != %s", (proposal_id,))
+        cursor.execute("UPDATE proposals SET status = 'Ingesting' WHERE id = %s", (proposal_id,))
+        conn.commit()
+        cursor.close()
         conn.close()
-        
+
         trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path)
         
         return jsonify({"message": "Job resumed successfully.", "proposal_id": proposal_id}), 200
@@ -351,6 +447,9 @@ def transition_proposal_status(proposal_id):
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Trigger next in queue if available
+        process_next_in_queue()
         
         return jsonify({"message": f"Proposal successfully transitioned to '{new_status}'"}), 200
         
