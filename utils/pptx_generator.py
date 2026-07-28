@@ -1157,11 +1157,11 @@ def generate_pptx(data, output_path):
 
     # Table layout
     resources = data.get("resources", [
-        {"role": "Engagement Partner", "fte": "0.25", "rate": "$30,000", "total": "$45,000", "person_days": 10},
-        {"role": "Lead Architect", "fte": "1.00", "rate": "$24,000", "total": "$144,000", "person_days": 60},
-        {"role": "Senior Frontend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
-        {"role": "Senior Backend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_days": 120},
-        {"role": "DevOps & Security Specialist", "fte": "1.00", "rate": "$9,000", "total": "$54,000", "person_days": 60}
+        {"role": "Engagement Partner", "fte": "0.25", "rate": "$30,000", "total": "$45,000", "person_hours": 80},
+        {"role": "Lead Architect", "fte": "1.00", "rate": "$24,000", "total": "$144,000", "person_hours": 480},
+        {"role": "Senior Frontend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_hours": 960},
+        {"role": "Senior Backend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_hours": 960},
+        {"role": "DevOps & Security Specialist", "fte": "1.00", "rate": "$9,000", "total": "$54,000", "person_hours": 480}
     ])
     
     rows = len(resources) + 2  # +1 for header, +1 for Total Assumption
@@ -1177,10 +1177,10 @@ def generate_pptx(data, output_path):
     # Column Widths
     table.columns[0].width = Inches(3.5) # Role
     table.columns[1].width = Inches(1.8) # Hourly Rate
-    table.columns[2].width = Inches(1.7) # Person Days
+    table.columns[2].width = Inches(1.7) # Person Hours
     table.columns[3].width = Inches(2.0) # Total Sizing
 
-    headers = ["Role / Competency", "Hourly Rate", "Person Days", "Total Financial Sizing"]
+    headers = ["Role / Competency", "Hourly Rate", "Person Hours", "Total Financial Sizing"]
     for j, header in enumerate(headers):
         cell = table.cell(0, j)
         cell.fill.solid()
@@ -1192,7 +1192,7 @@ def generate_pptx(data, output_path):
 
     for i, res in enumerate(resources[:rows-2]):
         row_idx = i + 1
-        cols_val = [res.get("role"), res.get("rate"), str(res.get("person_days", "N/A")), res.get("total")]
+        cols_val = [res.get("role"), res.get("rate"), str(res.get("person_hours", "N/A")), res.get("total")]
         for j, val in enumerate(cols_val):
             cell = table.cell(row_idx, j)
             cell.fill.solid()

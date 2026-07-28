@@ -131,6 +131,10 @@ def calculate_budget():
 def resume_proposal(proposal_id):
     return proposal_controller.resume_proposal(proposal_id)
 
+@app.route('/api/proposals/resume-rate/<proposal_id>', methods=['POST'])
+def api_resume_proposal_rate(proposal_id):
+    return proposal_controller.resume_proposal_rate(proposal_id)
+
 # ----------------------------------------------------
 # API ROUTES — Admin (admin only)
 # ----------------------------------------------------
@@ -377,3 +381,5 @@ if __name__ == '__main__':
     port = int(os.getenv("PORT", 5000))
     print(f"Starting server on port {port}...")
     app.run(host='0.0.0.0', port=port, debug=True)
+
+
