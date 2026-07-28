@@ -120,6 +120,12 @@ def update_proposal_status(proposal_id, status, file_path=None, json_ir=None):
                 (status, proposal_id)
             )
         conn.commit()
+        if status in ['Complete', 'Failed', 'Paused', 'Rejected']:
+            try:
+                from controllers.proposal_controller import start_next_queued_proposal
+                start_next_queued_proposal()
+            except Exception as e_queue:
+                print(f"Error triggering next queued proposal: {e_queue}")
     except Exception as e:
         print(f"Error updating proposal status: {e}")
     finally:
@@ -620,11 +626,11 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             {"phase": "Phase 5: Training", "duration": "Week 14", "deliverables": "User training & handover"}
         ]
         default_resources = [
-            {"role": "Engagement Director", "fte": "0.15", "rate": "$100", "total": "$21,600", "person_days": 10},
-            {"role": "Lead Architect", "fte": "1.00", "rate": "$80", "total": "$100,000", "person_days": 60},
-            {"role": "Senior Developer (Front-end)", "fte": "1.50", "rate": "$50", "total": "$48,000", "person_days": 90},
-            {"role": "Senior Developer (Back-end)", "fte": "1.50", "rate": "$50", "total": "$48,000", "person_days": 90},
-            {"role": "QA & Test Engineer", "fte": "1.00", "rate": "$40", "total": "$24,000", "person_days": 60}
+            {"role": "Project Manager", "fte": "1.00", "rate": "$60", "total": f"${10 * 8 * 60:,}", "person_days": 10},
+            {"role": "Solution Architect", "fte": "1.00", "rate": "$60", "total": f"${20 * 8 * 60:,}", "person_days": 20},
+            {"role": "AI/ML Engineer", "fte": "1.00", "rate": "$60", "total": f"${20 * 8 * 60:,}", "person_days": 20},
+            {"role": "Software Engineer", "fte": "1.00", "rate": "$38", "total": f"${40 * 8 * 38:,}", "person_days": 40},
+            {"role": "QA Engineer", "fte": "1.00", "rate": "$38", "total": f"${20 * 8 * 38:,}", "person_days": 20}
         ]
         default_skills = [
             {"skill": "React 18 & TypeScript", "role": "Senior Developer (Front-end)", "asset": "React/TypeScript Front-End Competency", "conf": "High (95%)"},
@@ -642,7 +648,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         
         plan_data = safe_json_loads(plan_raw, default_plan)
         timeline_phases = plan_data.get("timeline_phases", default_timeline)
-        resources = plan_data.get("resources", default_resources)
+        resources = default_resources
         skills_mapping = plan_data.get("skills_mapping", default_skills)
         
         # Calculate sizing summary
@@ -687,6 +693,55 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "skills_mapping": skills_mapping,
             "complex_diagrams": design_data.get("complex_diagrams", [])
         }
+        update_proposal_status(proposal_id, "WaitingForRateConfirmation", json_ir=json.dumps(partial_state_3))
+        return
+
+    except Exception as e:
+        print(f"Error in multi-agent pipeline phase 2: {e}")
+        import traceback
+        tb = traceback.format_exc()
+        update_proposal_status(proposal_id, "Failed")
+        for step in STEPS:
+            if step not in completed_steps:
+                update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
+
+def resume_orchestration_phase3(proposal_id, updated_resources):
+    """Phase 3 of Orchestration: Assembling, PPTX rendering."""
+    completed_steps = set()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        cursor.execute("SELECT step_name, status FROM proposal_steps WHERE proposal_id = %s", (proposal_id,))
+        for r in cursor.fetchall():
+            if (r.get('status') if isinstance(r, dict) else r[1]) == 'completed':
+                completed_steps.add(r.get('step_name') if isinstance(r, dict) else r[0])
+        cursor.close()
+        conn.close()
+    except: pass
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT structured_json_ir FROM proposals WHERE id = %s", (proposal_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row or not row.get("structured_json_ir"):
+            raise ValueError("No intermediate state found to resume phase 3.")
+            
+        draft_ir = json.loads(row["structured_json_ir"])
+        draft_ir["resources"] = updated_resources
+        
+        client_name = draft_ir.get("client_name", "Client")
+        project_duration = draft_ir.get("project_duration", "14 Weeks")
+        budget = draft_ir.get("budget", "$250,000")
+        
+        # ----------------------------------------------------
+        # 5. PROPOSAL ASSEMBLY AGENT (Assembly & Reflexion)
+        # ----------------------------------------------------
+        if "Assembling" not in completed_steps:
+            update_step_status(proposal_id, "Assembling", "running", "Assembling final proposal content and running Reflexion quality checks...")
+        
         
         reflexion_sys_prompt = (
             f"You are a Senior Reviewer auditing a proposal. The target budget is {budget} "
@@ -707,47 +762,22 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         else:
             final_ir_data = safe_json_loads(final_ir_raw, draft_ir)
         
-        # Python math override to ensure totals match budget
-        import re
+        # Python math override to calculate true total budget based on edited resources
         try:
-            target_budget_str = str(budget).replace(',', '').replace('$', '').strip()
-            target_budget_val = float(target_budget_str)
-            
-            dur_match = re.search(r'(\d+)', str(project_duration))
-            weeks = float(dur_match.group(1)) if dur_match else 32.0
-            months = max(weeks / 4.0, 1.0)
-
             resources_list = final_ir_data.get("resources", [])
             total_current = 0.0
-            parsed_res = []
             
             for r in resources_list:
                 tot_str = str(r.get("total", "0")).replace(',', '').replace('$', '').strip()
                 try:
                     tot_val = float(tot_str)
                 except:
-                    tot_val = 1000.0
+                    tot_val = 0.0
                 total_current += tot_val
-                parsed_res.append(tot_val)
-                
+                    
             if total_current > 0:
-                scale = target_budget_val / total_current
-                for i, r in enumerate(resources_list):
-                    new_tot = parsed_res[i] * scale
-                    try:
-                        fte_val = float(str(r.get("fte", "1.0")))
-                    except:
-                        fte_val = 1.0
-                    
-                    if fte_val > 0:
-                        new_rate = new_tot / (fte_val * months)
-                    else:
-                        new_rate = 0.0
-                        
-                    r["total"] = f"${int(new_tot):,}"
-                    r["rate"] = f"${int(new_rate):,}"
-                    
-            final_ir_data["resources"] = resources_list
+                final_ir_data["budget"] = f"${int(total_current):,}"
+                
         except Exception as math_e:
             print(f"Failed to normalize resource budget: {math_e}")
             

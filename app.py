@@ -97,9 +97,19 @@ def get_proposal_status(proposal_id):
     # All roles can view status
     return proposal_controller.get_proposal_status(proposal_id)
 
+@app.route('/api/proposals/<proposal_id>/pause', methods=['POST'])
+@require_role('presales', 'bidmanager', 'admin')
+def pause_proposal_job(proposal_id):
+    return proposal_controller.pause_proposal_job(proposal_id)
+
 @app.route('/api/proposals/<proposal_id>/resume', methods=['POST'])
 @require_role('presales', 'bidmanager', 'admin')
 def resume_proposal_job(proposal_id):
+    return proposal_controller.resume_proposal_job(proposal_id)
+
+@app.route('/api/proposals/<proposal_id>/prioritize', methods=['POST'])
+@require_role('presales', 'bidmanager', 'admin')
+def prioritize_proposal_job(proposal_id):
     return proposal_controller.resume_proposal_job(proposal_id)
 
 @app.route('/api/proposals/edit/<proposal_id>', methods=['POST'])
@@ -130,6 +140,10 @@ def calculate_budget():
 @require_role('presales', 'bidmanager', 'admin')
 def resume_proposal(proposal_id):
     return proposal_controller.resume_proposal(proposal_id)
+
+@app.route('/api/proposals/resume-rate/<proposal_id>', methods=['POST'])
+def api_resume_proposal_rate(proposal_id):
+    return proposal_controller.resume_proposal_rate(proposal_id)
 
 # ----------------------------------------------------
 # API ROUTES — Admin (admin only)
@@ -377,3 +391,5 @@ if __name__ == '__main__':
     port = int(os.getenv("PORT", 5000))
     print(f"Starting server on port {port}...")
     app.run(host='0.0.0.0', port=port, debug=True)
+
+
