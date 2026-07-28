@@ -54,7 +54,7 @@ class DesignAgent:
                 "  * 'business_problem': a list of exactly 3-4 strings representing key business/technical challenges.\n"
                 "  * 'our_approach': a list of exactly 3-4 strings detailing the steps or architectural choices built to solve it.\n"
                 "  * 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing the technical architecture of that case study.\n"
-                "  * 'tech_architecture_explanation': a list of exactly 3 strings representing concise summaries (1-2 sentences) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting.\n"
+                "  * 'tech_architecture_explanation': a list of exactly 3 strings representing extremely short and concise summaries (exactly 1 sentence, maximum 12 words per summary) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting. They must fit in a very small box.\n"
                 "  * 'key_technologies': a list of exactly 3-4 technologies used (e.g. ['Snowflake', 'Azure Data Factory']).\n"
                 "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
                 "Do not include any explanation or markdown formatting outside the JSON."

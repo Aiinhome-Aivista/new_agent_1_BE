@@ -617,3 +617,36 @@ def update_ai_model():
         return jsonify({"message": f"Active AI Model updated to {model_name}"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+def resume_proposal_rate(proposal_id):
+    try:
+        from flask import request, jsonify
+        data = request.get_json() or {}
+        updated_resources = data.get("resources", [])
+        
+        from database.db_connection import get_db_connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE proposals SET status = 'Assembling' WHERE id = %s",
+            (proposal_id,)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        from agents.orchestrator import resume_orchestration_phase3
+        import threading
+        
+        thread = threading.Thread(
+            target=resume_orchestration_phase3,
+            args=(proposal_id, updated_resources)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({"message": f"Resumed orchestration phase 3 for {proposal_id}"}), 200
+    except Exception as e:
+        from flask import jsonify
+        return jsonify({"error": str(e)}), 500
+

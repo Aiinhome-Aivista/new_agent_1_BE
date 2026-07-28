@@ -115,7 +115,7 @@ def upload_case_study():
                 "- business_problem\n"
                 "- our_approach\n"
                 "- tech_architecture_mermaid\n"
-                "- tech_architecture_explanation\n"
+                "- tech_architecture_explanation (a list of exactly 3 strings representing extremely short and concise summaries, maximum 1 sentence and 12 words each: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting)\n"
                 "- key_technologies\n"
                 "- benefits_outcome\n"
                 "Return ONLY JSON."
