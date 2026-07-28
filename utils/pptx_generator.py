@@ -312,7 +312,8 @@ def add_reference_architecture_slide(slide, prs, data):
     bg.fill.fore_color.rgb = WHITE
     bg.line.fill.background()
 
-    create_slide_header(slide, "Reference Architecture", "Enterprise logical data patterns")
+    proposal_title = data.get("proposal_title", "Solution") if data else "Solution"
+    create_slide_header(slide, f"{proposal_title} - Reference Architecture", "Enterprise logical data patterns")
     add_footer(slide)
 
     cloud_name = "Azure"
@@ -421,7 +422,8 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
     elif data and ("gcp" in str(data).lower() or "google" in str(data).lower()):
         cloud_name = "Google Cloud"
 
-    create_slide_header(slide, f"Landscape Architecture ({cloud_name} Cloud Platform)", f"{cloud_name} Native Services & Integration Topology")
+    proposal_title = data.get("proposal_title", "Solution") if data else "Solution"
+    create_slide_header(slide, f"{proposal_title} - Landscape Architecture ({cloud_name} Cloud Platform)", f"{cloud_name} Native Services & Integration Topology")
     add_footer(slide)
         
     db_name = data.get("db_tech", "PostgreSQL") if data else "PostgreSQL"

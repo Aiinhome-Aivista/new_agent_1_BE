@@ -265,9 +265,7 @@ def resume_proposal_job(proposal_id):
         conn.commit()
         cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files FROM proposals WHERE id = %s", (proposal_id,))
         row = cursor.fetchone()
-        cursor.close()
-        conn.close()
-
+        
         if not row:
             return jsonify({"error": "Proposal not found"}), 404
             
@@ -288,6 +286,7 @@ def resume_proposal_job(proposal_id):
         pt_row = cursor.fetchone()
         ppt_template_path = pt_row[0] if pt_row else None
         cursor.close()
+        conn.close()
         
         trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path)
         
@@ -673,4 +672,3 @@ def resume_proposal_rate(proposal_id):
     except Exception as e:
         from flask import jsonify
         return jsonify({"error": str(e)}), 500
-
