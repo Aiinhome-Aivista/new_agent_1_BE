@@ -207,7 +207,7 @@ def safe_json_loads(json_str, fallback):
         print(f"Failed to parse JSON: {e}. Raw content: {json_str}")
         return fallback
 
-def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, resume=False):
+def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None, resume=False):
     """The full Multi-Agent pipeline, executing step-by-step using LLM and fallback defaults."""
     full_case_study_text = ""
     completed_steps = set()
@@ -352,7 +352,7 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                 arango_client.insert("documents", doc_record)
 
         # Process case study documents if provided
-        extracted_case_study_text_blocks = []
+        structured_case_studies = []
         parsed_case_study_files = 0
         if case_study_files:
             for file_data in case_study_files:
@@ -362,8 +362,26 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                     txt = extract_text(saved_path)
                     if txt:
                         parsed_case_study_files += 1
-                        extracted_case_study_text_blocks.append(f"--- Case Study Document: {orig_name} ---\n{txt}")
-        full_case_study_text = "\n\n".join(extracted_case_study_text_blocks).strip()
+                        cs_prompt = (
+                            "You are an expert bid manager. Extract the following details from this case study text to create a structured project summary.\n"
+                            "Respond ONLY as a JSON object with these keys:\n"
+                            "  * 'project_name': short name of the project.\n"
+                            "  * 'client_industry': industry/details of the client.\n"
+                            "  * 'business_problem': a list of exactly 3-4 strings representing key business/technical challenges.\n"
+                            "  * 'our_approach': a list of exactly 3-4 strings detailing the steps or architectural choices built to solve it.\n"
+                            "  * 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR') representing the technical architecture.\n"
+                            "  * 'tech_architecture_explanation': a list of exactly 3 strings representing concise summaries (1-2 sentences) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting.\n"
+                            "  * 'key_technologies': a list of exactly 3-4 technologies used.\n"
+                            "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
+                            "Do not include any formatting or text outside the JSON."
+                        )
+                        raw_json = query_llm(cs_prompt, txt[:4000], json_mode=True)
+                        if raw_json:
+                            cs_obj = safe_json_loads(raw_json, None)
+                            if cs_obj:
+                                structured_case_studies.append(cs_obj)
+        
+        full_case_study_text = "See structured case studies."
 
         full_document_text = "\n\n".join(extracted_text_blocks).strip()
         
@@ -454,7 +472,9 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "rag_options": advanced_options.get("rag_options", []),
             "action_engine_options": advanced_options.get("action_engine_options", []),
             "guardrail_options": advanced_options.get("guardrail_options", []),
-            "case_study_text": full_case_study_text
+            "case_study_text": full_case_study_text,
+            "structured_case_studies": structured_case_studies,
+            "ppt_template_path": ppt_template_path
         }
         update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
         
@@ -502,6 +522,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         requirements = partial_state.get("requirements", [])
         gaps = partial_state.get("gaps", [])
         case_study_text = partial_state.get("case_study_text", "")
+        structured_case_studies = partial_state.get("structured_case_studies", [])
+        ppt_template_path = partial_state.get("ppt_template_path", None)
         
         # Retrieve persistent case studies from DB
         db_case_study_text = ""
@@ -640,6 +662,13 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         if "Assembling" not in completed_steps:
             update_step_status(proposal_id, "Assembling", "running", "Assembling final proposal content and running Reflexion quality checks...")
         
+        if structured_case_studies:
+            final_similar_projects = structured_case_studies
+        elif db_case_studies_list:
+            final_similar_projects = db_case_studies_list
+        else:
+            final_similar_projects = design_data.get("similar_projects", [])
+
         draft_ir = {
             "proposal_title": "Autonomous Proposal Document Creator Platform",
             "client_name": client_name,
@@ -652,7 +681,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "business_summary": design_data.get("business_summary", ""),
             "data_flow": design_data.get("data_flow", []),
             "infrastructure_approximation": design_data.get("infrastructure_approximation", []),
-            "similar_projects": db_case_studies_list if db_case_studies_list else design_data.get("similar_projects", []),
+            "similar_projects": final_similar_projects,
             "timeline_phases": timeline_phases,
             "resources": resources,
             "skills_mapping": skills_mapping,
@@ -746,7 +775,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         file_name = f"{safe_client_name}_Proposal.pptx"
         file_path = os.path.join(out_dir, file_name)
         
-        generate_pptx(final_ir_data, file_path)
+        generate_pptx(final_ir_data, file_path, template_path=ppt_template_path)
         
         relative_path = f"/static/proposals/{file_name}"
         
@@ -766,19 +795,19 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
                 update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
 
-def trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None):
+def trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None):
     thread = __import__('threading').Thread(
         target=run_orchestration,
-        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, True)
+        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path, True)
     )
     thread.daemon = True
     thread.start()
 
-def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None):
+def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None):
     """Triggers the orchestrator thread asynchronously so UI remains non-blocking."""
     thread = threading.Thread(
         target=run_orchestration,
-        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files)
+        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path)
     )
     thread.daemon = True
     thread.start()

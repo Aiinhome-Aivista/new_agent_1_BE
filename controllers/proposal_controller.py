@@ -60,6 +60,15 @@ def upload_proposal():
                     "original_name": file.filename,
                     "saved_path": save_path
                 })
+                
+        # Parse ppt template file if any
+        ppt_template_path = None
+        ppt_template_file = request.files.get("ppt_template")
+        if ppt_template_file and ppt_template_file.filename:
+            safe_name = f"{uuid.uuid4()}_{ppt_template_file.filename}"
+            save_path = os.path.join(upload_dir, safe_name)
+            ppt_template_file.save(save_path)
+            ppt_template_path = save_path
         
         proposal_id = str(uuid.uuid4())[:8] # Short unique ID
         
@@ -67,8 +76,8 @@ def upload_proposal():
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO proposals (id, client_name, project_duration, budget, status) VALUES (%s, %s, %s, %s, %s)",
-            (proposal_id, client_name, project_duration, budget, "Ingesting")
+            "INSERT INTO proposals (id, client_name, project_duration, budget, status, ppt_template_file) VALUES (%s, %s, %s, %s, %s, %s)",
+            (proposal_id, client_name, project_duration, budget, "Ingesting", ppt_template_path)
         )
         conn.commit()
         cursor.close()
@@ -82,7 +91,8 @@ def upload_proposal():
             budget=budget,
             files_info=uploaded_files,
             requirements_text=requirements_text,
-            case_study_files=uploaded_case_study_files
+            case_study_files=uploaded_case_study_files,
+            ppt_template_path=ppt_template_path
         )
         
         return jsonify({
@@ -186,7 +196,14 @@ def resume_proposal_job(proposal_id):
         # Assuming we need to import run_orchestration here or it's already imported
         # Wait, trigger_proposal_job triggers the thread, we should use a similar trigger_resume_job
         from agents.orchestrator import trigger_resume_job
-        trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files)
+        # Get ppt_template_file from DB
+        cursor = conn.cursor()
+        cursor.execute("SELECT ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        pt_row = cursor.fetchone()
+        ppt_template_path = pt_row[0] if pt_row else None
+        cursor.close()
+        
+        trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path)
         
         return jsonify({"message": "Job resumed successfully.", "proposal_id": proposal_id}), 200
     except Exception as e:
@@ -444,12 +461,20 @@ def retry_proposal_job(proposal_id):
         conn.close()
         
         # Trigger job async
+        # In a real retry, we would fetch ppt_template_file from db as well, but for now we skip or fetch it
+        cursor = conn.cursor()
+        cursor.execute("SELECT ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        pt_row = cursor.fetchone()
+        ppt_template_path = pt_row[0] if pt_row else None
+        cursor.close()
+        
         trigger_proposal_job(
             proposal_id=proposal_id,
             client_name=client_name,
             project_duration=project_duration,
             budget=budget,
-            files_info=[] # Clean retry
+            files_info=[], # Clean retry
+            ppt_template_path=ppt_template_path
         )
         return jsonify({"message": f"Job retry triggered for proposal {proposal_id}"}), 200
     except Exception as e:

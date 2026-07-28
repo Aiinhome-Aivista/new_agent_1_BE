@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS proposals (
     files_info LONGTEXT NULL,
     requirements_text LONGTEXT NULL,
     case_study_files LONGTEXT NULL,
+    ppt_template_file VARCHAR(500) NULL,
     draft_ir LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -5,12 +5,12 @@ with open('agents/orchestrator.py', 'r') as f:
 # For Phase 1
 text = text.replace(
     '        update_step_status(proposal_id, "Ingesting", "running", "Processing RFP files, reading case studies, and chunking into ArangoDB...")',
-    '        if "Ingesting" not in completed_steps:\n            update_step_status(proposal_id, "Ingesting", "running", "Processing RFP files, reading case studies, and chunking into ArangoDB...")'
+    '        if "Ingesting" not in completedd, "Analyzing", "running", "Extracting requirements & querying internal assets repository (RAG)...")',
+    '        if "Analyzing" not in complet_steps:\n            update_step_status(proposal_id, "Ingesting", "running", "Processing RFP files, reading case studies, and chunking into ArangoDB...")'
 )
 
 text = text.replace(
-    '        update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying internal assets repository (RAG)...")',
-    '        if "Analyzing" not in completed_steps:\n            update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying internal assets repository (RAG)...")'
+    '        update_step_status(proposal_ied_steps:\n            update_step_status(proposal_id, "Analyzing", "running", "Extracting requirements & querying internal assets repository (RAG)...")'
 )
 
 text = text.replace(

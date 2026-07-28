@@ -494,8 +494,11 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
                 pass
 
 
-def generate_pptx(data, output_path):
-    prs = Presentation()
+def generate_pptx(data, output_path, template_path=None):
+    if template_path and os.path.exists(template_path):
+        prs = Presentation(template_path)
+    else:
+        prs = Presentation()
     # Standard 4:3 is default, let's change to 16:9 widescreen
     prs.slide_width = Inches(10)
     prs.slide_height = Inches(7.5)
@@ -503,7 +506,12 @@ def generate_pptx(data, output_path):
     # ----------------------------------------------------
     # SLIDE 1: Title Cover (Dark/Orange Premium Design)
     # ----------------------------------------------------
-    blank_slide_layout = prs.slide_layouts[6]
+    # Try to find a blank layout, usually index 6 in default templates, but we fall back to the first available if not
+    try:
+        blank_slide_layout = prs.slide_layouts[6]
+    except IndexError:
+        blank_slide_layout = prs.slide_layouts[0]
+        
     slide = prs.slides.add_slide(blank_slide_layout)
     
     # Set background color
