@@ -120,12 +120,6 @@ def update_proposal_status(proposal_id, status, file_path=None, json_ir=None):
                 (status, proposal_id)
             )
         conn.commit()
-        if status in ['Complete', 'Failed', 'Paused', 'Rejected']:
-            try:
-                from controllers.proposal_controller import start_next_queued_proposal
-                start_next_queued_proposal()
-            except Exception as e_queue:
-                print(f"Error triggering next queued proposal: {e_queue}")
     except Exception as e:
         print(f"Error updating proposal status: {e}")
     finally:
