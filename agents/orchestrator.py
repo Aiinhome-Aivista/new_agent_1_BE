@@ -687,7 +687,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "skills_mapping": skills_mapping,
             "complex_diagrams": design_data.get("complex_diagrams", [])
         }
-        update_proposal_status(proposal_id, "WaitingForRateConfirmation", json_ir=json.dumps(partial_state_3))
+        update_proposal_status(proposal_id, "WaitingForRateConfirmation", json_ir=json.dumps(draft_ir))
         return
 
     except Exception as e:
@@ -715,7 +715,7 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT structured_json_ir FROM proposals WHERE id = %s", (proposal_id,))
+        cursor.execute("SELECT structured_json_ir, ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -723,6 +723,7 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
         if not row or not row.get("structured_json_ir"):
             raise ValueError("No intermediate state found to resume phase 3.")
             
+        ppt_template_path = row.get("ppt_template_file")
         draft_ir = json.loads(row["structured_json_ir"])
         draft_ir["resources"] = updated_resources
         
