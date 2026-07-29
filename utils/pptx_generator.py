@@ -955,6 +955,163 @@ def generate_pptx(data, output_path, template_path=None):
         set_font(p_d_desc.runs[0], size=9, color=CHARCOAL)
 
     # ----------------------------------------------------
+    # SLIDE 6: Effort & Person-Hour Conversion
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "Effort & Person-Hour Conversion", "Allocated program FTE structure, rate cards, and financial sizing")
+    add_footer(slide)
+
+    # Table layout
+    resources = data.get("resources", [
+        {"role": "Engagement Partner", "fte": "0.25", "rate": "$30,000", "total": "$45,000", "person_hours": 80},
+        {"role": "Lead Architect", "fte": "1.00", "rate": "$24,000", "total": "$144,000", "person_hours": 480},
+        {"role": "Senior Frontend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_hours": 960},
+        {"role": "Senior Backend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_hours": 960},
+        {"role": "DevOps & Security Specialist", "fte": "1.00", "rate": "$9,000", "total": "$54,000", "person_hours": 480}
+    ])
+    
+    rows = len(resources) + 2  # +1 for header, +1 for Total Assumption
+    # Cap rows to fit on one slide
+    rows = min(rows, 9)
+    cols = 4
+    
+    # Calculate a sensible height for the table depending on rows
+    table_height = Inches(0.4 * rows)
+    table_shape = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(1.5), Inches(9.0), table_height)
+    table = table_shape.table
+
+    # Column Widths
+    table.columns[0].width = Inches(3.5) # Role
+    table.columns[1].width = Inches(1.8) # Hourly Rate
+    table.columns[2].width = Inches(1.7) # Person Hours
+    table.columns[3].width = Inches(2.0) # Total Sizing
+
+    headers = ["Role / Competency", "Hourly Rate", "Person Hours", "Total Financial Sizing"]
+    for j, header in enumerate(headers):
+        cell = table.cell(0, j)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = CHARCOAL
+        p = cell.text_frame.paragraphs[0]
+        p.text = safe_text(header)
+        p.alignment = PP_ALIGN.CENTER
+        set_font(p.runs[0], size=11, bold=True, color=WHITE)
+
+    for i, res in enumerate(resources[:rows-2]):
+        row_idx = i + 1
+        cols_val = [res.get("role"), res.get("rate"), str(res.get("person_hours", "N/A")), res.get("total")]
+        for j, val in enumerate(cols_val):
+            cell = table.cell(row_idx, j)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
+            p = cell.text_frame.paragraphs[0]
+            p.text = safe_text(val)
+            p.alignment = PP_ALIGN.CENTER if j > 0 else PP_ALIGN.LEFT
+            set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
+            
+    # Add Total Assumption Row
+    last_row_idx = rows - 1
+    
+    total_hourly_rate = 0
+    for res in resources[:rows-2]:
+        rate_str = res.get("rate", "0")
+        try:
+            rate_val = float(str(rate_str).replace('$', '').replace(',', '').strip())
+            total_hourly_rate += rate_val
+        except:
+            pass
+
+    for j in range(cols):
+        cell = table.cell(last_row_idx, j)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = ORANGE
+        p = cell.text_frame.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        if j == 0:
+            p.text = "Total Assumption"
+            p.alignment = PP_ALIGN.LEFT
+        elif j == 1:
+            p.text = f"${int(total_hourly_rate):,}"
+        elif j == 3:
+            p.text = str(safe_text(data.get("budget", "N/A")))
+        else:
+            p.text = " "
+        if p.runs:
+            set_font(p.runs[0], size=11, bold=True, color=WHITE)
+
+    # Add Disclaimer below table
+    disclaimer_top = Inches(1.5 + (0.4 * rows) + 0.3)
+    disclaimer_box = slide.shapes.add_textbox(Inches(0.5), disclaimer_top, Inches(9.0), Inches(0.8))
+    tf_disc = disclaimer_box.text_frame
+    tf_disc.word_wrap = True
+    p_disc = tf_disc.paragraphs[0]
+    p_disc.text = "Disclaimer: Please note that this high-level estimate is subject to change as it depends on detailed client requirements. All resource and pricing calculations reflect the median baseline for similar enterprise integrations."
+    set_font(p_disc.runs[0], size=10, italic=True, color=CHARCOAL)
+
+    # ----------------------------------------------------
+    # SLIDE 7: Required Skills & Competency Matching
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    create_slide_header(slide, "Skills Inventory & Competency Mapping", "Required technical capabilities grounded in organizational assets")
+    add_footer(slide)
+
+    skills_map = data.get("skills_mapping", [
+        {"skill": "React 18, TypeScript, Tailwind", "role": "Frontend Developer", "conf": "[✔]"},
+        {"skill": "Flask API, Python Core", "role": "Backend Developer", "conf": "[✔]"},
+        {"skill": "MySQL Connector, RAG Store", "role": "Database Architect", "conf": "[✔]"},
+        {"skill": "python-pptx Engine", "role": "Orchestrator Agent", "conf": "[✔]"},
+        {"skill": "CI/CD & DevOps", "role": "DevOps Engineer", "conf": "[✔]"}
+    ])
+    
+    rows2 = len(skills_map) + 1
+    # Cap rows to fit on one slide
+    rows2 = min(rows2, 9)
+    cols2 = 2
+    
+    table_height2 = Inches(0.4 * rows2)
+    table_shape2 = slide.shapes.add_table(rows2, cols2, Inches(0.5), Inches(1.5), Inches(9.0), table_height2)
+    table2 = table_shape2.table
+
+    table2.columns[0].width = Inches(4.5) # Skill Name
+    table2.columns[1].width = Inches(4.5) # Target Role
+
+    headers2 = ["Technical Skill", "Target Project Role"]
+    for j, header in enumerate(headers2):
+        cell = table2.cell(0, j)
+        cell.fill.solid()
+        cell.fill.fore_color.rgb = ORANGE
+        p = cell.text_frame.paragraphs[0]
+        p.text = safe_text(header)
+        p.alignment = PP_ALIGN.CENTER
+        set_font(p.runs[0], size=11, bold=True, color=WHITE)
+
+    for i, item in enumerate(skills_map[:rows2-1]):
+        row_idx = i + 1
+        cols_val = [item.get("skill"), item.get("role")]
+        for j, val in enumerate(cols_val):
+            cell = table2.cell(row_idx, j)
+            cell.fill.solid()
+            cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
+            p = cell.text_frame.paragraphs[0]
+            p.text = safe_text(val)
+            p.alignment = PP_ALIGN.LEFT
+            set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
+
+    # ----------------------------------------------------
+    # HARDCODED "SAME TO SAME" ARCHITECTURE DIAGRAMS
+    # ----------------------------------------------------
+    # Slide 8: Reference Architecture
+    ref_slide = prs.slides.add_slide(blank_slide_layout)
+    add_reference_architecture_slide(ref_slide, prs, data)
+
+    # Slide 9: Azure Landscape Architecture
+    azure_slide = prs.slides.add_slide(blank_slide_layout)
+    add_azure_landscape_architecture_slide(azure_slide, prs, data)
+
+
+
+
+
+    # ----------------------------------------------------
     # SLIDE 5B: Case Study
     # ----------------------------------------------------
     sim_projects = data.get("similar_projects", [])
@@ -1157,163 +1314,6 @@ def generate_pptx(data, output_path, template_path=None):
                 p.text = f"• {safe_text(ben)}"
                 set_font(p.runs[0], size=7.0, color=CHARCOAL)
                 p.space_after = Pt(1)
-
-    # ----------------------------------------------------
-    # SLIDE 6: Effort & Person-Hour Conversion
-    # ----------------------------------------------------
-    slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Effort & Person-Hour Conversion", "Allocated program FTE structure, rate cards, and financial sizing")
-    add_footer(slide)
-
-    # Table layout
-    resources = data.get("resources", [
-        {"role": "Engagement Partner", "fte": "0.25", "rate": "$30,000", "total": "$45,000", "person_hours": 80},
-        {"role": "Lead Architect", "fte": "1.00", "rate": "$24,000", "total": "$144,000", "person_hours": 480},
-        {"role": "Senior Frontend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_hours": 960},
-        {"role": "Senior Backend Developer", "fte": "2.00", "rate": "$8,000", "total": "$96,000", "person_hours": 960},
-        {"role": "DevOps & Security Specialist", "fte": "1.00", "rate": "$9,000", "total": "$54,000", "person_hours": 480}
-    ])
-    
-    rows = len(resources) + 2  # +1 for header, +1 for Total Assumption
-    # Cap rows to fit on one slide
-    rows = min(rows, 9)
-    cols = 4
-    
-    # Calculate a sensible height for the table depending on rows
-    table_height = Inches(0.4 * rows)
-    table_shape = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(1.5), Inches(9.0), table_height)
-    table = table_shape.table
-
-    # Column Widths
-    table.columns[0].width = Inches(3.5) # Role
-    table.columns[1].width = Inches(1.8) # Hourly Rate
-    table.columns[2].width = Inches(1.7) # Person Hours
-    table.columns[3].width = Inches(2.0) # Total Sizing
-
-    headers = ["Role / Competency", "Hourly Rate", "Person Hours", "Total Financial Sizing"]
-    for j, header in enumerate(headers):
-        cell = table.cell(0, j)
-        cell.fill.solid()
-        cell.fill.fore_color.rgb = CHARCOAL
-        p = cell.text_frame.paragraphs[0]
-        p.text = safe_text(header)
-        p.alignment = PP_ALIGN.CENTER
-        set_font(p.runs[0], size=11, bold=True, color=WHITE)
-
-    for i, res in enumerate(resources[:rows-2]):
-        row_idx = i + 1
-        cols_val = [res.get("role"), res.get("rate"), str(res.get("person_hours", "N/A")), res.get("total")]
-        for j, val in enumerate(cols_val):
-            cell = table.cell(row_idx, j)
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
-            p = cell.text_frame.paragraphs[0]
-            p.text = safe_text(val)
-            p.alignment = PP_ALIGN.CENTER if j > 0 else PP_ALIGN.LEFT
-            set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
-            
-    # Add Total Assumption Row
-    last_row_idx = rows - 1
-    
-    total_hourly_rate = 0
-    for res in resources[:rows-2]:
-        rate_str = res.get("rate", "0")
-        try:
-            rate_val = float(str(rate_str).replace('$', '').replace(',', '').strip())
-            total_hourly_rate += rate_val
-        except:
-            pass
-
-    for j in range(cols):
-        cell = table.cell(last_row_idx, j)
-        cell.fill.solid()
-        cell.fill.fore_color.rgb = ORANGE
-        p = cell.text_frame.paragraphs[0]
-        p.alignment = PP_ALIGN.CENTER
-        if j == 0:
-            p.text = "Total Assumption"
-            p.alignment = PP_ALIGN.LEFT
-        elif j == 1:
-            p.text = f"${int(total_hourly_rate):,}"
-        elif j == 3:
-            p.text = str(safe_text(data.get("budget", "N/A")))
-        else:
-            p.text = " "
-        if p.runs:
-            set_font(p.runs[0], size=11, bold=True, color=WHITE)
-
-    # Add Disclaimer below table
-    disclaimer_top = Inches(1.5 + (0.4 * rows) + 0.3)
-    disclaimer_box = slide.shapes.add_textbox(Inches(0.5), disclaimer_top, Inches(9.0), Inches(0.8))
-    tf_disc = disclaimer_box.text_frame
-    tf_disc.word_wrap = True
-    p_disc = tf_disc.paragraphs[0]
-    p_disc.text = "Disclaimer: Please note that this high-level estimate is subject to change as it depends on detailed client requirements. All resource and pricing calculations reflect the median baseline for similar enterprise integrations."
-    set_font(p_disc.runs[0], size=10, italic=True, color=CHARCOAL)
-
-    # ----------------------------------------------------
-    # SLIDE 7: Required Skills & Competency Matching
-    # ----------------------------------------------------
-    slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Skills Inventory & Competency Mapping", "Required technical capabilities grounded in organizational assets")
-    add_footer(slide)
-
-    skills_map = data.get("skills_mapping", [
-        {"skill": "React 18, TypeScript, Tailwind", "role": "Frontend Developer", "conf": "[✔]"},
-        {"skill": "Flask API, Python Core", "role": "Backend Developer", "conf": "[✔]"},
-        {"skill": "MySQL Connector, RAG Store", "role": "Database Architect", "conf": "[✔]"},
-        {"skill": "python-pptx Engine", "role": "Orchestrator Agent", "conf": "[✔]"},
-        {"skill": "CI/CD & DevOps", "role": "DevOps Engineer", "conf": "[✔]"}
-    ])
-    
-    rows2 = len(skills_map) + 1
-    # Cap rows to fit on one slide
-    rows2 = min(rows2, 9)
-    cols2 = 2
-    
-    table_height2 = Inches(0.4 * rows2)
-    table_shape2 = slide.shapes.add_table(rows2, cols2, Inches(0.5), Inches(1.5), Inches(9.0), table_height2)
-    table2 = table_shape2.table
-
-    table2.columns[0].width = Inches(4.5) # Skill Name
-    table2.columns[1].width = Inches(4.5) # Target Role
-
-    headers2 = ["Technical Skill", "Target Project Role"]
-    for j, header in enumerate(headers2):
-        cell = table2.cell(0, j)
-        cell.fill.solid()
-        cell.fill.fore_color.rgb = ORANGE
-        p = cell.text_frame.paragraphs[0]
-        p.text = safe_text(header)
-        p.alignment = PP_ALIGN.CENTER
-        set_font(p.runs[0], size=11, bold=True, color=WHITE)
-
-    for i, item in enumerate(skills_map[:rows2-1]):
-        row_idx = i + 1
-        cols_val = [item.get("skill"), item.get("role")]
-        for j, val in enumerate(cols_val):
-            cell = table2.cell(row_idx, j)
-            cell.fill.solid()
-            cell.fill.fore_color.rgb = WHITE if row_idx % 2 == 0 else OFF_WHITE
-            p = cell.text_frame.paragraphs[0]
-            p.text = safe_text(val)
-            p.alignment = PP_ALIGN.LEFT
-            set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
-
-    # ----------------------------------------------------
-    # HARDCODED "SAME TO SAME" ARCHITECTURE DIAGRAMS
-    # ----------------------------------------------------
-    # Slide 8: Reference Architecture
-    ref_slide = prs.slides.add_slide(blank_slide_layout)
-    add_reference_architecture_slide(ref_slide, prs, data)
-
-    # Slide 9: Azure Landscape Architecture
-    azure_slide = prs.slides.add_slide(blank_slide_layout)
-    add_azure_landscape_architecture_slide(azure_slide, prs, data)
-
-
-
-
 
     # Slide 10: Thank You Slide
     thank_you_slide = prs.slides.add_slide(blank_slide_layout)
