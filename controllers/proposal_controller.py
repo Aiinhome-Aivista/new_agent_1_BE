@@ -195,6 +195,20 @@ def pause_proposal_job(proposal_id):
     except Exception as e:
         return jsonify({"error": f"Failed to pause: {str(e)}"}), 500
 
+def cancel_proposal_job(proposal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE proposals SET status = 'Cancelled' WHERE id = %s", (proposal_id,))
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        process_next_in_queue()
+        return jsonify({"message": "Proposal cancelled successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": f"Failed to cancel: {str(e)}"}), 500
+
 def process_next_in_queue():
     try:
         conn = get_db_connection()

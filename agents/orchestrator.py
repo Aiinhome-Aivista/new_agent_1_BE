@@ -122,7 +122,7 @@ def update_proposal_status(proposal_id, status, file_path=None, json_ir=None):
         conn.commit()
         
         # Trigger next in queue if status is terminal or waiting
-        if status in ('Complete', 'Failed', 'Paused', 'WaitingForTechSelection', 'WaitingForRateConfirmation'):
+        if status in ('Complete', 'Failed', 'Paused', 'Cancelled', 'WaitingForTechSelection', 'WaitingForRateConfirmation'):
             try:
                 from controllers.proposal_controller import process_next_in_queue
                 process_next_in_queue()

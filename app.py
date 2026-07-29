@@ -102,6 +102,11 @@ def get_proposal_status(proposal_id):
 def pause_proposal_job(proposal_id):
     return proposal_controller.pause_proposal_job(proposal_id)
 
+@app.route('/api/proposals/<proposal_id>/cancel', methods=['POST'])
+@require_role('presales', 'bidmanager', 'admin')
+def cancel_proposal_job(proposal_id):
+    return proposal_controller.cancel_proposal_job(proposal_id)
+
 @app.route('/api/proposals/<proposal_id>/resume', methods=['POST'])
 @require_role('presales', 'bidmanager', 'admin')
 def resume_proposal_job(proposal_id):
