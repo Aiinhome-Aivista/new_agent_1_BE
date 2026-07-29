@@ -5,22 +5,61 @@ from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
-MISTRAL_MODE = os.getenv("MISTRAL_MODE", "Local")
+MODE = os.getenv("MODE", "Local")
 MISTRAL_LOCAL_URL = os.getenv("MISTRAL_LOCAL_URL")
 MISTRAL_LOCAL_MODEL = os.getenv("MISTRAL_LOCAL_MODEL")
 MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
 MODEL_NAME = os.getenv("MODEL_NAME", "mistral-small-latest")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
 def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json_mode=False):
     """
-    Sends a chat completion request to the chosen Mistral LLM endpoint.
+    Sends a chat completion request to the chosen LLM endpoint.
     """
-    print(f"--- Using Mistral LLM in {MISTRAL_MODE.upper()} mode ---")
+    print(f"--- Using LLM in {MODE.upper()} mode ---")
     headers = {
         "Content-Type": "application/json"
     }
 
-    if MISTRAL_MODE.lower() == "cloud":
+    if MODE.lower() == "gemini":
+        print(f"✅ REST Client: Connecting to Gemini API (Model: {GEMINI_MODEL})")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": f"System: {system_prompt}\n\nUser: {user_prompt}"}
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens
+            }
+        }
+        if json_mode:
+            payload["generationConfig"]["responseMimeType"] = "application/json"
+            
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=300)
+            if response.status_code == 200:
+                res_json = response.json()
+                candidates = res_json.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    if parts:
+                        return parts[0].get("text", "")
+                return None
+            else:
+                print(f"Gemini API failed with status {response.status_code}: {response.text}")
+                return None
+        except Exception as e:
+            print(f"Gemini API request exception: {e}")
+            return None
+
+    elif MODE.lower() == "cloud":
+        print(f"✅ REST Client: Connecting to Mistral Cloud API (Model: {MODEL_NAME})")
         url = "https://api.mistral.ai/v1/chat/completions"
         headers["Authorization"] = f"Bearer {MISTRAL_API_KEY}"
         payload = {
@@ -51,6 +90,7 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
             print(f"Mistral Cloud API request exception: {e}")
             return None
     
+    print(f"✅ REST Client: Connecting to Local Mistral (URL: {MISTRAL_LOCAL_URL}, Model: {MISTRAL_LOCAL_MODEL})")
     # Try Ollama endpoint format first for Local Mode
     url_ollama = f"{MISTRAL_LOCAL_URL.rstrip('/')}/api/chat"
     payload_ollama = {

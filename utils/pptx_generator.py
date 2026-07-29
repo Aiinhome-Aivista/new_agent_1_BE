@@ -313,7 +313,7 @@ def add_reference_architecture_slide(slide, prs, data):
     bg.line.fill.background()
 
     proposal_title = data.get("proposal_title", "Solution") if data else "Solution"
-    create_slide_header(slide, f"{proposal_title} - Reference Architecture", "Enterprise logical data patterns")
+    create_slide_header(slide, "Reference Architecture", "Enterprise logical data patterns")
     add_footer(slide)
 
     cloud_name = "Azure"
@@ -397,10 +397,15 @@ def add_reference_architecture_slide(slide, prs, data):
         "    CC --> HRI\n"
     )
 
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(9), Inches(0.4))
+    p = txBox.text_frame.paragraphs[0]
+    p.text = "System Data Flow & Orchestration Architecture"
+    set_font(p.runs[0], size=16, bold=True, color=CHARCOAL)
+
     temp_img_path = render_mermaid_to_image(mermaid_code)
     if temp_img_path and os.path.exists(temp_img_path):
         try:
-            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.0), Inches(9.6), Inches(6.0))
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.5), Inches(9.6), Inches(5.5))
         except Exception as e:
             print(f"Failed to add mermaid image to Reference Architecture slide: {e}")
         finally:
@@ -423,7 +428,7 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
         cloud_name = "Google Cloud"
 
     proposal_title = data.get("proposal_title", "Solution") if data else "Solution"
-    create_slide_header(slide, f"{proposal_title} - Landscape Architecture ({cloud_name} Cloud Platform)", f"{cloud_name} Native Services & Integration Topology")
+    create_slide_header(slide, f"Landscape Architecture ({cloud_name} Cloud Platform)", f"{cloud_name} Native Services & Integration Topology")
     add_footer(slide)
         
     db_name = data.get("db_tech", "PostgreSQL") if data else "PostgreSQL"
@@ -483,10 +488,15 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
         "    AKS --> Search\n"
     )
 
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(9), Inches(0.4))
+    p = txBox.text_frame.paragraphs[0]
+    p.text = f"{cloud_name} Cloud Native Deployment Topology"
+    set_font(p.runs[0], size=16, bold=True, color=CHARCOAL)
+
     temp_img_path = render_mermaid_to_image(mermaid_code)
     if temp_img_path and os.path.exists(temp_img_path):
         try:
-            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.0), Inches(9.6), Inches(6.0))
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.5), Inches(9.6), Inches(5.5))
         except Exception as e:
             print(f"Failed to add mermaid image to Landscape slide: {e}")
         finally:

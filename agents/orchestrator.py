@@ -608,8 +608,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "'duration' (weeks range), and 'deliverables' (key activities/deliverables text).\n"
             "- 'resources': a list of exactly 5 resource roles. Each resource object contains: "
             "'role' (string), 'fte' (decimal string, e.g., '1.00', '0.25'), "
-            "'rate' (hourly rate string, e.g., '$50'), 'total' (total cost calculation for this resource as a string, e.g. '$10,000'), "
-            "and 'person_days' (integer representing total estimated effort in days, e.g. 40).\n"
+            "'rate' (hourly rate string, e.g., '$90'), 'total' (total cost calculation for this resource as a string, e.g. '$10,000'), "
+            "and 'person_hours' (integer representing total estimated effort in hours, e.g. 160).\n"
             "- 'skills_mapping': a list of exactly 5 skills mapping objects. Each object contains: "
             "'skill' (technical skill name), 'role' (matching project role), 'asset' (matching Internal Asset/Competency name), "
             "and 'conf' (confidence percentage string, e.g. '95%').\n"
@@ -631,11 +631,11 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             {"phase": "Phase 5: Training", "duration": "Week 14", "deliverables": "User training & handover"}
         ]
         default_resources = [
-            {"role": "Project Manager", "fte": "1.00", "rate": "$60", "total": f"${10 * 8 * 60:,}", "person_days": 10},
-            {"role": "Solution Architect", "fte": "1.00", "rate": "$60", "total": f"${20 * 8 * 60:,}", "person_days": 20},
-            {"role": "AI/ML Engineer", "fte": "1.00", "rate": "$60", "total": f"${20 * 8 * 60:,}", "person_days": 20},
-            {"role": "Software Engineer", "fte": "1.00", "rate": "$38", "total": f"${40 * 8 * 38:,}", "person_days": 40},
-            {"role": "QA Engineer", "fte": "1.00", "rate": "$38", "total": f"${20 * 8 * 38:,}", "person_days": 20}
+            {"role": "Project Manager", "fte": "0.50", "rate": "$60", "total": f"${80 * 60:,}", "person_hours": 80},
+            {"role": "Solution Architect", "fte": "0.50", "rate": "$60", "total": f"${80 * 60:,}", "person_hours": 80},
+            {"role": "AI/ML Engineer", "fte": "1.00", "rate": "$60", "total": f"${160 * 60:,}", "person_hours": 160},
+            {"role": "Software Engineer", "fte": "1.00", "rate": "$38", "total": f"${160 * 38:,}", "person_hours": 160},
+            {"role": "QA Engineer", "fte": "0.50", "rate": "$38", "total": f"${80 * 38:,}", "person_hours": 80}
         ]
         default_skills = [
             {"skill": "React 18 & TypeScript", "role": "Senior Developer (Front-end)", "asset": "React/TypeScript Front-End Competency", "conf": "High (95%)"},

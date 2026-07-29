@@ -32,7 +32,10 @@ class IntakeAgent:
         chain = prompt | self.llm
         try:
             res = chain.invoke({"chunk": chunk_content[:1500]})
-            clean = res.content.strip().strip("'\"`").strip()
+            content_str = res.content
+            if isinstance(content_str, list):
+                content_str = content_str[0].get("text", "") if len(content_str) > 0 and isinstance(content_str[0], dict) else str(content_str)
+            clean = content_str.strip().strip("'\"`").strip()
             for cat in ["Background", "Requirements", "Financial & Sizing", "Compliance & Security", "Other"]:
                 if cat.lower() in clean.lower():
                     return cat
@@ -60,7 +63,10 @@ class IntakeAgent:
         chain = prompt | self.llm_json
         try:
             res = chain.invoke({"text": full_document_text[:5000]})
-            content = res.content.strip()
+            content_str = res.content
+            if isinstance(content_str, list):
+                content_str = content_str[0].get("text", "") if len(content_str) > 0 and isinstance(content_str[0], dict) else str(content_str)
+            content = content_str.strip()
             # Clean markdown code blocks if the model accidentally returned them
             if content.startswith("```json"):
                 content = content[7:]
