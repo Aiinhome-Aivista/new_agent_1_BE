@@ -240,7 +240,8 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
 
         # Initialize steps in database as 'pending'
         for step in STEPS:
-            update_step_status(proposal_id, step, "pending", "Waiting to start...")
+            if step not in completed_steps:
+                update_step_status(proposal_id, step, "pending", "Waiting to start...")
 
 
         # ----------------------------------------------------
