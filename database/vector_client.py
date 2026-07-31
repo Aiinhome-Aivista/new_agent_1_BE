@@ -105,16 +105,53 @@ def get_chroma_collection(collection_name):
         metadata={"hnsw:space": "cosine"}
     )
 
+def chunk_text(text, chunk_size=300, overlap=50):
+    """Splits text into chunks of `chunk_size` words with an overlap of `overlap` words."""
+    words = text.split()
+    chunks = []
+    if not words:
+        return chunks
+        
+    if len(words) <= chunk_size:
+        return [text]
+        
+    for i in range(0, len(words), chunk_size - overlap):
+        chunk = " ".join(words[i:i + chunk_size])
+        if chunk:
+            chunks.append(chunk)
+    return chunks
+
 def store_embedding(collection_name, doc_id, text, metadata=None):
-    """Stores text, its embedding, and metadata in a ChromaDB collection."""
+    """Stores text by chunking it, getting embeddings for each chunk, and storing in a ChromaDB collection with metadata."""
     collection = get_chroma_collection(collection_name)
-    embedding = get_embedding(text)
     
+    chunks = chunk_text(text, chunk_size=300, overlap=50)
+    if not chunks:
+        return False
+        
+    ids = []
+    embeddings = []
+    documents = []
+    metadatas = []
+    
+    for idx, chunk in enumerate(chunks):
+        chunk_id = f"{doc_id}_chunk_{idx}"
+        emb = get_embedding(chunk)
+        
+        chunk_meta = metadata.copy() if metadata else {}
+        chunk_meta["chunk_index"] = idx
+        chunk_meta["parent_doc_id"] = str(doc_id)
+        
+        ids.append(chunk_id)
+        embeddings.append(emb)
+        documents.append(chunk)
+        metadatas.append(chunk_meta)
+        
     collection.upsert(
-        ids=[str(doc_id)],
-        embeddings=[embedding],
-        documents=[text],
-        metadatas=[metadata] if metadata else [{}]
+        ids=ids,
+        embeddings=embeddings,
+        documents=documents,
+        metadatas=metadatas
     )
     return True
 
