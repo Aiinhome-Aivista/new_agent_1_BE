@@ -151,6 +151,12 @@ def render_mermaid_to_image(mermaid_code):
     mermaid_code = mermaid_code.strip()
     
     # Strip any custom inline style/class declarations to enforce corporate base theme
+    if isinstance(mermaid_code, dict) or isinstance(mermaid_code, list):
+        import json
+        mermaid_code = json.dumps(mermaid_code)
+    else:
+        mermaid_code = str(mermaid_code)
+        
     lines = mermaid_code.split('\n')
     cleaned_lines = []
     for line in lines:
@@ -563,6 +569,13 @@ def generate_pptx(data, output_path, template_path=None):
     tf_sum.word_wrap = True
     
     business_summary = data.get("business_summary", "No business summary provided.")
+    if isinstance(business_summary, dict):
+        business_summary = "\n".join([str(v) for v in business_summary.values()])
+    elif isinstance(business_summary, list):
+        business_summary = "\n".join([str(v) for v in business_summary])
+    else:
+        business_summary = str(business_summary)
+        
     for paragraph in business_summary.split('\n'):
         if paragraph.strip():
             p_sum = tf_sum.add_paragraph()
@@ -1225,13 +1238,19 @@ def generate_pptx(data, output_path, template_path=None):
             r_label_box.fill.fore_color.rgb = WHITE
             r_label_box.line.fill.background()
             
-            # Mermaid Diagram
+            # Technical Architecture Image (Extracted from Document or Mermaid Diagram)
+            extracted_img = proj.get("extracted_architecture_image")
             mermaid_code = proj.get("tech_architecture_mermaid")
-            if mermaid_code:
+            
+            if extracted_img and os.path.exists(extracted_img):
+                try:
+                    slide.shapes.add_picture(extracted_img, Inches(5.1), Inches(1.8), Inches(4.3), Inches(1.7))
+                except Exception as img_e:
+                    print(f"Failed to add extracted architecture image: {img_e}")
+            elif mermaid_code:
                 try:
                     temp_img_path = render_mermaid_to_image(mermaid_code)
                     if temp_img_path and os.path.exists(temp_img_path):
-                        # Use a fixed dimension to prevent the wide horizontal flowchart from scaling down too small
                         slide.shapes.add_picture(temp_img_path, Inches(5.1), Inches(1.8), Inches(4.3), Inches(1.7))
                 except Exception as img_e:
                     print(f"Failed to add case study mermaid image: {img_e}")

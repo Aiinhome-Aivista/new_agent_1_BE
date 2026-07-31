@@ -171,7 +171,13 @@ def query_rag_assets(requirements):
             matched = False
             for asset in assets:
                 # Check if asset name or description matches keywords in requirement
-                capabilities = [c.strip().lower() for c in asset.get("capabilities", "").split(",")]
+                raw_caps = asset.get("capabilities", "")
+                if isinstance(raw_caps, (dict, list)):
+                    import json
+                    raw_caps = json.dumps(raw_caps)
+                else:
+                    raw_caps = str(raw_caps)
+                capabilities = [c.strip().lower() for c in raw_caps.split(",")]
                 req_lower = req.lower()
                 
                 # Check if any capability tag is mentioned in client requirement
@@ -391,6 +397,12 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                         if raw_json:
                             cs_obj = safe_json_loads(raw_json, None)
                             if cs_obj:
+                                # Extract architecture image
+                                from utils.image_extractor import extract_architecture_image
+                                arch_image_path = extract_architecture_image(saved_path)
+                                if arch_image_path:
+                                    cs_obj["extracted_architecture_image"] = arch_image_path.replace("\\", "/")
+                                    
                                 structured_case_studies.append(cs_obj)
         
         full_case_study_text = "See structured case studies."

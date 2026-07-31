@@ -62,6 +62,8 @@ def extract_text(file_path):
         raw_text = extract_text_from_pdf(file_path)
     elif ext in [".docx", ".doc"]:
         raw_text = extract_text_from_docx(file_path)
+    elif ext in [".png", ".jpg", ".jpeg", ".gif", ".bmp"]:
+        raw_text = "This is an image case study. Please extract key information visually if possible. For now, we will use default text."
     else:
         # Default text/markdown/json direct reading
         try:

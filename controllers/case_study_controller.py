@@ -144,6 +144,13 @@ def upload_case_study():
             capabilities = ", ".join(
                 parsed_data.get("key_technologies", [])
             )
+            
+            # Extract architecture image
+            from utils.image_extractor import extract_architecture_image
+            arch_image_path = extract_architecture_image(save_path)
+            if arch_image_path:
+                # Convert backslashes to forward slashes for cross-platform compatibility
+                parsed_data["extracted_architecture_image"] = arch_image_path.replace("\\", "/")
 
             cursor.execute(
                 """

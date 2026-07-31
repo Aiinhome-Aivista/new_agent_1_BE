@@ -60,6 +60,13 @@ def create_business_summary_slide() -> str:
     tf_sum.word_wrap = True
     
     business_summary = _data.get("business_summary", "No business summary provided.")
+    if isinstance(business_summary, dict):
+        business_summary = "\n".join([str(v) for v in business_summary.values()])
+    elif isinstance(business_summary, list):
+        business_summary = "\n".join([str(v) for v in business_summary])
+    else:
+        business_summary = str(business_summary)
+        
     for paragraph in business_summary.split('\n'):
         if paragraph.strip():
             p_sum = tf_sum.add_paragraph()
