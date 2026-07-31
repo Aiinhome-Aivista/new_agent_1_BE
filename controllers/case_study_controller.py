@@ -1,3 +1,4 @@
+from utils.prompts import CASE_STUDY_CONTROLLER_SYS_PROMPT_1
 import os
 import uuid
 import json
@@ -25,11 +26,7 @@ from utils.llm_client import query_llm
 #             return jsonify({"error": "Failed to extract text from file"}), 400
             
 #         # Call LLM to parse text into rich case study JSON schema
-#         sys_prompt = (
-#             "You are an expert Solutions Architect. Parse the provided case study document text "
-#             "and format it into a structured JSON object representing a detailed case study.\n\n"
-#             "Your response must ONLY be a JSON object with these keys:\n"
-#             "- 'project_name': short name of the project (e.g. 'Teradata to Snowflake migration').\n"
+#         prompt = CASE_STUDY_CONTROLLER_SYS_PROMPT_0.\n"
 #             "- 'client_industry': industry/details of the client (e.g. 'Lifestyle Footwear Company in US').\n"
 #             "- 'business_problem': a list of exactly 3-4 strings representing key business/technical challenges.\n"
 #             "- 'our_approach': a list of exactly 3-4 strings detailing the steps or architectural choices built to solve it.\n"
@@ -106,20 +103,7 @@ def upload_case_study():
             if not text or not text.strip():
                 continue
 
-            sys_prompt = (
-                "You are an expert Solutions Architect. Parse the provided case study document text "
-                "and format it into a structured JSON object representing a detailed case study.\n\n"
-                "Your response must ONLY be a JSON object with these keys:\n"
-                "- project_name\n"
-                "- client_industry\n"
-                "- business_problem\n"
-                "- our_approach\n"
-                "- tech_architecture_mermaid\n"
-                "- tech_architecture_explanation (a list of exactly 3 strings representing extremely short and concise summaries, maximum 1 sentence and 12 words each: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting)\n"
-                "- key_technologies\n"
-                "- benefits_outcome\n"
-                "Return ONLY JSON."
-            )
+            sys_prompt = CASE_STUDY_CONTROLLER_SYS_PROMPT_1
 
             res = query_llm(sys_prompt, text, json_mode=True)
 

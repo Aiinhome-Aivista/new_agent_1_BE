@@ -1,3 +1,4 @@
+from utils.prompts import ORCHESTRATOR_SYS_PROMPT_0, ORCHESTRATOR_SYS_PROMPT_1
 import os
 import json
 import uuid
@@ -29,16 +30,7 @@ def chunk_text(text, chunk_size=1000, overlap=100):
 
 def classify_chunk(chunk_content):
     """Queries Mistral to classify the document chunk."""
-    sys_prompt = (
-        "You are an assistant that classifies document sections from an RFP.\n"
-        "Classify the text into exactly one of these labels:\n"
-        "- Background\n"
-        "- Requirements\n"
-        "- Financial & Sizing\n"
-        "- Compliance & Security\n"
-        "- Other\n"
-        "Respond ONLY with the selected label (e.g. 'Requirements'). No markdown, punctuation or explanation."
-    )
+    sys_prompt = ORCHESTRATOR_SYS_PROMPT_0
     res = query_llm(sys_prompt, chunk_content[:1500])
     if res:
         clean = res.strip().strip("'\"`").strip()
@@ -380,19 +372,7 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                     txt = extract_text(saved_path)
                     if txt:
                         parsed_case_study_files += 1
-                        cs_prompt = (
-                            "You are an expert bid manager. Extract the following details from this case study text to create a structured project summary.\n"
-                            "Respond ONLY as a JSON object with these keys:\n"
-                            "  * 'project_name': short name of the project.\n"
-                            "  * 'client_industry': industry/details of the client.\n"
-                            "  * 'business_problem': a list of exactly 3-4 strings representing key business/technical challenges.\n"
-                            "  * 'our_approach': a list of exactly 3-4 strings detailing the steps or architectural choices built to solve it.\n"
-                            "  * 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR') representing the technical architecture.\n"
-                            "  * 'tech_architecture_explanation': a list of exactly 3 strings representing concise summaries (1-2 sentences) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting.\n"
-                            "  * 'key_technologies': a list of exactly 3-4 technologies used.\n"
-                            "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
-                            "Do not include any formatting or text outside the JSON."
-                        )
+                        cs_prompt = ORCHESTRATOR_SYS_PROMPT_1
                         raw_json = query_llm(cs_prompt, txt[:4000], json_mode=True)
                         if raw_json:
                             cs_obj = safe_json_loads(raw_json, None)
@@ -780,6 +760,10 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
             final_ir_data = draft_ir
         else:
             final_ir_data = safe_json_loads(final_ir_raw, draft_ir)
+            # Ensure non-LLM modified fields like extracted images are preserved
+            for key in ["similar_projects", "complex_diagrams"]:
+                if key in draft_ir:
+                    final_ir_data[key] = draft_ir[key]
         
         # Python math override to calculate true total budget based on edited resources
         try:

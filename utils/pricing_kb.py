@@ -1,3 +1,4 @@
+from utils.prompts import PRICING_KB_SYS_PROMPT_0, PRICING_KB_SYS_PROMPT_2
 import json
 from database.vector_client import search_embeddings
 from utils.llm_client import query_llm, safe_json_loads
@@ -40,21 +41,7 @@ def get_technology_options():
         return empty_options
 
     # Call LLM to classify these unique skills
-    sys_prompt = (
-        "You are an IT solution architect. Given a list of technical skills or tools, "
-        "categorize each skill into exactly one of three groups: 'ui' (frontend/UI/styling framework), "
-        "'backend' (backend/API/server framework/runtime), or 'database' (databases/caching/datastores).\n"
-        "Ignore other non-UI/non-backend/non-database keywords like AWS, Azure, DevOps, Terraform, Ansible, Migration, etc.\n"
-        "Respond ONLY with a JSON object containing three keys: 'ui', 'backend', and 'database'.\n"
-        "Under each key, provide a list of objects with 'value' (lowercase slug, e.g. 'react') and 'label' (nice display name, e.g. 'React.js').\n"
-        "Example format:\n"
-        "{\n"
-        "  \"ui\": [{\"value\": \"react\", \"label\": \"React.js\"}],\n"
-        "  \"backend\": [{\"value\": \"flask\", \"label\": \"Flask (Python)\"}],\n"
-        "  \"database\": [{\"value\": \"mysql\", \"label\": \"MySQL\"}]\n"
-        "}\n"
-        "Do not include any explanation or markdown formatting."
-    )
+    sys_prompt = PRICING_KB_SYS_PROMPT_0
     user_prompt = f"List of skills to classify:\n{', '.join(all_skills)}"
     
     try:
@@ -116,20 +103,9 @@ def calculate_budget(ui_tech, backend_tech, db_tech):
     context_str = "\n".join(kb_context) if kb_context else "No specific pricing knowledge found."
     
     # 3. Prompt LLM to calculate the budget
-    sys_prompt = (
-        "You are a technical presales estimator. You need to calculate the total software development budget based on the selected tech stack.\n"
-        "Read the provided Knowledge Base Context to find the cost associated with each technology. If a technology's cost is missing, estimate it reasonably (e.g., $15000).\n"
-        "Include a base platform setup cost of $15000.\n"
-        "Respond ONLY as a JSON object with two keys:\n"
-        "- 'total_cost': an integer representing the total sum.\n"
-        "- 'formatted_budget': a string formatted as currency (e.g., '$75,000').\n"
-        "Do not include markdown or explanations."
-    )
+    sys_prompt = PRICING_KB_SYS_PROMPT_2
     
-    user_prompt = (
-        f"Selected Tech Stack:\n- UI: {ui_label}\n- Backend: {backend_label}\n- Database: {db_label}\n\n"
-        f"Knowledge Base Context:\n{context_str}"
-    )
+    user_prompt = f"Selected Tech Stack:\n- UI: {ui_label}\n- Backend: {backend_label}\n- Database: {db_label}\n\nKnowledge Base Context:\n{context_str}"
     
     response = query_llm(sys_prompt, user_prompt, json_mode=True)
     

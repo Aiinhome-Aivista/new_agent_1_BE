@@ -1,3 +1,4 @@
+from utils.prompts import INTAKE_AGENT_PROMPT_0, INTAKE_AGENT_PROMPT_1
 import json
 from langchain_core.prompts import ChatPromptTemplate
 from agents.langchain_llm import get_llm
@@ -15,19 +16,7 @@ class IntakeAgent:
         """
         Classifies RFP chunk content into pre-defined categories.
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", (
-                "You are a document processing assistant specialized in RFPs and proposals.\n"
-                "Classify the text chunk into exactly one of these labels:\n"
-                "- Background\n"
-                "- Requirements\n"
-                "- Financial & Sizing\n"
-                "- Compliance & Security\n"
-                "- Other\n"
-                "Respond ONLY with the selected label (e.g. 'Requirements'). No markdown, punctuation or explanation."
-            )),
-            ("user", "RFP Document Chunk:\n\n{chunk}")
-        ])
+        prompt = INTAKE_AGENT_PROMPT_0
         
         chain = prompt | self.llm
         try:
@@ -47,18 +36,7 @@ class IntakeAgent:
         """
         Extracts client name, project duration, and budget from RFP text.
         """
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", (
-                "You are an assistant that extracts metadata from client RFPs.\n"
-                "Extract the following values if they are present in the text:\n"
-                "1. Client Name (the company asking for the proposal, e.g. 'Acme Corporation')\n"
-                "2. Project Duration/Timeline (e.g. '14 Weeks')\n"
-                "3. Target Budget (e.g. '$250,000')\n"
-                "Respond ONLY with a JSON object containing keys: 'client_name', 'project_duration', 'budget'.\n"
-                "Do not include markdown code block syntax or comments."
-            )),
-            ("user", "RFP Text Snippet:\n\n{text}")
-        ])
+        prompt = INTAKE_AGENT_PROMPT_1
         
         chain = prompt | self.llm_json
         try:
