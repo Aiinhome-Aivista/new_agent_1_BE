@@ -1,10 +1,11 @@
 import os
 import uuid
 import json
-from flask import request, jsonify, send_file
+from flask import request, send_file
 from database.db_connection import get_db_connection
 from agents.orchestrator import trigger_proposal_job, STEPS, update_step_status
 from utils.pptx_generator import generate_pptx
+from utils.api_response import success_response, error_response
 
 def format_datetime(val):
     if not val:
@@ -105,13 +106,13 @@ def upload_proposal():
         else:
             msg = "Proposal added to queue"
 
-        return jsonify({
+        return success_response({
             "message": msg,
             "proposal_id": proposal_id
-        }), 202
+        }, status_code=202)
         
     except Exception as e:
-        return jsonify({"error": f"Failed to upload and start job: {str(e)}"}), 500
+        return error_response(f"Failed to upload and start job: {str(e)}", status_code=500)
 
 def get_proposals_list():
     try:
@@ -127,10 +128,10 @@ def get_proposals_list():
             if row.get("created_at"):
                 row["created_at"] = format_datetime(row["created_at"])
                 
-        return jsonify(rows), 200
+        return success_response(rows)
     except Exception as e:
         # Fallback offline support
-        return jsonify([]), 200
+        return success_response([])
 
 def get_proposal_status(proposal_id):
     try:
@@ -144,7 +145,7 @@ def get_proposal_status(proposal_id):
         if not proposal:
             cursor.close()
             conn.close()
-            return jsonify({"error": "Proposal not found"}), 404
+            return error_response("Proposal not found", status_code=404)
             
         # Fetch steps details
         cursor.execute("SELECT step_name, status, log_message, updated_at FROM proposal_steps WHERE proposal_id = %s ORDER BY id ASC", (proposal_id,))
@@ -171,14 +172,14 @@ def get_proposal_status(proposal_id):
             except:
                 pass
                 
-        return jsonify({
+        return success_response({
             "proposal": proposal,
             "steps": formatted_steps,
             "structured_ir": structured_ir
-        }), 200
+        })
         
     except Exception as e:
-        return jsonify({"error": f"Error retrieving job status: {str(e)}"}), 500
+        return error_response(f"Error retrieving job status: {str(e)}", status_code=500)
 
 
 def pause_proposal_job(proposal_id):
@@ -191,9 +192,9 @@ def pause_proposal_job(proposal_id):
         conn.close()
         
         process_next_in_queue()
-        return jsonify({"message": "Proposal paused successfully"}), 200
+        return success_response({"message": "Proposal paused successfully"})
     except Exception as e:
-        return jsonify({"error": f"Failed to pause: {str(e)}"}), 500
+        return error_response(f"Failed to pause: {str(e)}", status_code=500)
 
 def cancel_proposal_job(proposal_id):
     try:
@@ -205,9 +206,9 @@ def cancel_proposal_job(proposal_id):
         conn.close()
         
         process_next_in_queue()
-        return jsonify({"message": "Proposal cancelled successfully"}), 200
+        return success_response({"message": "Proposal cancelled successfully"})
     except Exception as e:
-        return jsonify({"error": f"Failed to cancel: {str(e)}"}), 500
+        return error_response(f"Failed to cancel: {str(e)}", status_code=500)
 
 def process_next_in_queue():
     try:
@@ -281,7 +282,7 @@ def resume_proposal_job(proposal_id):
         row = cursor.fetchone()
         
         if not row:
-            return jsonify({"error": "Proposal not found"}), 404
+            return error_response("Proposal not found", status_code=404)
             
         client_name = row.get("client_name") if isinstance(row, dict) else row[0]
         project_duration = row.get("project_duration") if isinstance(row, dict) else row[1]
@@ -313,16 +314,16 @@ def resume_proposal_job(proposal_id):
 
         trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path)
         
-        return jsonify({"message": "Job resumed successfully.", "proposal_id": proposal_id}), 200
+        return success_response({"message": "Job resumed successfully.", "proposal_id": proposal_id})
     except Exception as e:
-        return jsonify({"error": f"Error resuming job: {str(e)}"}), 500
+        return error_response(f"Error resuming job: {str(e)}", status_code=500)
 
 def edit_proposal_ir(proposal_id):
     """Saves updated JSON IR, then deterministically regenerates the PPTX file (HITL workflow)."""
     try:
         new_ir_data = request.get_json()
         if not new_ir_data:
-            return jsonify({"error": "JSON body data is required"}), 400
+            return error_response("JSON body data is required", status_code=400)
             
         # Regenerate pptx file
         out_dir = os.path.join(os.getcwd(), 'static', 'proposals')
@@ -343,14 +344,14 @@ def edit_proposal_ir(proposal_id):
         cursor.close()
         conn.close()
         
-        return jsonify({
+        return success_response({
             "message": "Proposal document updated and regenerated successfully",
             "file_path": f"/static/proposals/{file_name}",
             "structured_ir": new_ir_data
-        }), 200
+        })
         
     except Exception as e:
-        return jsonify({"error": f"Failed to edit and update proposal: {str(e)}"}), 500
+        return error_response(f"Failed to edit and update proposal: {str(e)}", status_code=500)
 
 def download_proposal_pptx(proposal_id):
     try:
@@ -362,7 +363,7 @@ def download_proposal_pptx(proposal_id):
         conn.close()
         
         if not row or not row.get("generated_file_path"):
-            return jsonify({"error": "Proposal file not generated yet"}), 400
+            return error_response("Proposal file not generated yet", status_code=400)
             
         relative_path = row["generated_file_path"]
         # Convert relative URL /static/proposals/... to local absolute filepath
@@ -372,10 +373,10 @@ def download_proposal_pptx(proposal_id):
         if os.path.exists(absolute_path):
             return send_file(absolute_path, as_attachment=True, download_name=filename)
         else:
-            return jsonify({"error": f"File not found on disk at: {absolute_path}"}), 404
+            return error_response(f"File not found on disk at: {absolute_path}", status_code=404)
             
     except Exception as e:
-        return jsonify({"error": f"Failed to send file: {str(e)}"}), 500
+        return error_response(f"Failed to send file: {str(e)}", status_code=500)
 
 def transition_proposal_status(proposal_id):
     """Enforce a strict role-based state machine for proposal business workflow.
@@ -394,9 +395,9 @@ def transition_proposal_status(proposal_id):
         user_role = data.get("user_role", "").strip()
         
         if not new_status:
-            return jsonify({"error": "Status is required"}), 400
+            return error_response("Status is required", status_code=400)
         if not user_role:
-            return jsonify({"error": "user_role is required"}), 400
+            return error_response("user_role is required", status_code=400)
             
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
@@ -406,7 +407,7 @@ def transition_proposal_status(proposal_id):
         if not prop:
             cursor.close()
             conn.close()
-            return jsonify({"error": "Proposal not found"}), 404
+            return error_response("Proposal not found", status_code=404)
             
         current_status = prop["status"]
         
@@ -427,17 +428,12 @@ def transition_proposal_status(proposal_id):
         if allowed_roles_for_transition is None:
             cursor.close()
             conn.close()
-            return jsonify({
-                "error": f"Transition from '{current_status}' to '{new_status}' is not a valid workflow step."
-            }), 400
+            return error_response(f"Transition from '{current_status}' to '{new_status}' is not a valid workflow step.", status_code=400)
         
         if user_role not in allowed_roles_for_transition:
             cursor.close()
             conn.close()
-            return jsonify({
-                "error": f"Role '{user_role}' cannot transition from '{current_status}' to '{new_status}'. "
-                         f"Allowed roles: {list(allowed_roles_for_transition)}"
-            }), 403
+            return error_response(f"Role '{user_role}' cannot transition from '{current_status}' to '{new_status}'. Allowed roles: {list(allowed_roles_for_transition)}", status_code=403)
             
         # Perform status update, record who made the transition and when
         cursor.execute(
@@ -465,10 +461,10 @@ def transition_proposal_status(proposal_id):
         # Trigger next in queue if available
         process_next_in_queue()
         
-        return jsonify({"message": f"Proposal successfully transitioned to '{new_status}'"}), 200
+        return success_response({"message": f"Proposal successfully transitioned to '{new_status}'"})
         
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 
 def get_users():
@@ -482,9 +478,9 @@ def get_users():
         for r in rows:
             if r.get("created_at"):
                 r["created_at"] = format_datetime(r["created_at"])
-        return jsonify(rows), 200
+        return success_response(rows)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def change_user_role():
     try:
@@ -493,7 +489,7 @@ def change_user_role():
         new_role = data.get("role")
         
         if not username or not new_role:
-            return jsonify({"error": "Username and role are required"}), 400
+            return error_response("Username and role are required", status_code=400)
             
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -501,9 +497,9 @@ def change_user_role():
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({"message": f"User {username} role updated to {new_role}"}), 200
+        return success_response({"message": f"User {username} role updated to {new_role}"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def get_admin_config():
     try:
@@ -522,9 +518,9 @@ def get_admin_config():
             "mistral_url": os.getenv("MISTRAL_LOCAL_URL"),
             "active_ai_model": os.getenv("MISTRAL_LOCAL_MODEL", "mistral-small:24b"),
         }
-        return jsonify(config_data), 200
+        return success_response(config_data)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def get_all_audit_logs():
     try:
@@ -542,9 +538,9 @@ def get_all_audit_logs():
         for r in rows:
             if r.get("updated_at"):
                 r["updated_at"] = format_datetime(r["updated_at"])
-        return jsonify(rows), 200
+        return success_response(rows)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def retry_proposal_job(proposal_id):
     try:
@@ -556,7 +552,7 @@ def retry_proposal_job(proposal_id):
         conn.close()
         
         if not prop:
-            return jsonify({"error": "Proposal not found"}), 404
+            return error_response("Proposal not found", status_code=404)
             
         client_name = prop["client_name"]
         project_duration = prop["project_duration"]
@@ -587,18 +583,18 @@ def retry_proposal_job(proposal_id):
             files_info=[], # Clean retry
             ppt_template_path=ppt_template_path
         )
-        return jsonify({"message": f"Job retry triggered for proposal {proposal_id}"}), 200
+        return success_response({"message": f"Job retry triggered for proposal {proposal_id}"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def get_tech_options():
     try:
         from utils.pricing_kb import get_technology_options
-        return jsonify(get_technology_options()), 200
+        return success_response(get_technology_options())
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def calculate_budget():
     try:
@@ -609,9 +605,9 @@ def calculate_budget():
         
         from utils.pricing_kb import calculate_budget as calc_budget
         budget_info = calc_budget(ui_tech, backend_tech, db_tech)
-        return jsonify(budget_info), 200
+        return success_response(budget_info)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def resume_proposal(proposal_id):
     try:
@@ -645,16 +641,16 @@ def resume_proposal(proposal_id):
         thread.daemon = True
         thread.start()
         
-        return jsonify({"message": f"Resumed orchestration for {proposal_id} with new budget {final_budget}"}), 200
+        return success_response({"message": f"Resumed orchestration for {proposal_id} with new budget {final_budget}"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def update_ai_model():
     try:
         data = request.get_json() or {}
         model_name = data.get("model_name")
         if not model_name:
-            return jsonify({"error": "Model name is required"}), 400
+            return error_response("Model name is required", status_code=400)
             
         # Update environment variable
         os.environ["MISTRAL_LOCAL_MODEL"] = model_name
@@ -663,13 +659,13 @@ def update_ai_model():
         utils.llm_client.MISTRAL_LOCAL_MODEL = model_name
         database.vector_client.MISTRAL_LOCAL_MODEL = model_name
         
-        return jsonify({"message": f"Active AI Model updated to {model_name}"}), 200
+        return success_response({"message": f"Active AI Model updated to {model_name}"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def resume_proposal_rate(proposal_id):
     try:
-        from flask import request, jsonify
+        from flask import request
         data = request.get_json() or {}
         updated_resources = data.get("resources", [])
         
@@ -694,7 +690,6 @@ def resume_proposal_rate(proposal_id):
         thread.daemon = True
         thread.start()
         
-        return jsonify({"message": f"Resumed orchestration phase 3 for {proposal_id}"}), 200
+        return success_response({"message": f"Resumed orchestration phase 3 for {proposal_id}"})
     except Exception as e:
-        from flask import jsonify
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)

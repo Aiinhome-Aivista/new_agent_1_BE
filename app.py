@@ -12,6 +12,7 @@ from database.db_connection import init_db, get_db_connection
 import controllers.auth_controller as auth_controller
 import controllers.proposal_controller as proposal_controller
 import controllers.case_study_controller as case_study_controller
+from utils.api_response import success_response, error_response
 
 app = Flask(__name__)
 # Enable CORS for React dev server (usually localhost:5173)
@@ -38,18 +39,19 @@ def require_role(*allowed_roles):
         def decorated_function(*args, **kwargs):
             user_role = request.headers.get('X-User-Role', '').strip()
             if not user_role:
-                return jsonify({"error": "Missing X-User-Role header. Access denied."}), 403
+                return error_response("Missing X-User-Role header. Access denied.", status_code=403)
             if user_role not in allowed_roles:
-                return jsonify({
-                    "error": f"Role '{user_role}' is not authorized for this action. Required: {list(allowed_roles)}"
-                }), 403
+                return error_response(
+                    f"Role '{user_role}' is not authorized for this action. Required: {list(allowed_roles)}",
+                    status_code=403
+                )
             return f(*args, **kwargs)
         return decorated_function
     return decorator
 
 @app.route('/')
 def health_check():
-    return jsonify({"message": "Server is running!"}), 200
+    return success_response({"message": "Server is running!"})
 
 # Serve static files (uploads and generated presentations)
 @app.route('/static/<path:path>')
@@ -200,9 +202,9 @@ def get_knowledge():
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
-        return jsonify(rows), 200
+        return success_response(rows)
     except Exception as e:
-        return jsonify([]), 200
+        return success_response([])
 
 @app.route('/api/knowledge', methods=['POST'])
 @require_role('presales', 'admin')
@@ -215,11 +217,11 @@ def add_knowledge():
         
         # We expect a multipart/form-data upload with multiple files under the key "files"
         if 'files' not in request.files:
-            return jsonify({"error": "No files provided"}), 400
+            return error_response("No files provided", status_code=400)
             
         files = request.files.getlist("files")
         if not files or all(f.filename == '' for f in files):
-            return jsonify({"error": "No selected files"}), 400
+            return error_response("No selected files", status_code=400)
             
         upload_dir = os.path.join(os.getcwd(), 'static', 'uploads', 'knowledge')
         os.makedirs(upload_dir, exist_ok=True)
@@ -288,11 +290,11 @@ def add_knowledge():
         cursor.close()
         conn.close()
         
-        return jsonify({"message": f"Successfully uploaded and indexed {processed_count} files"}), 201
+        return success_response({"message": f"Successfully uploaded and indexed {processed_count} files"}, status_code=201)
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 @app.route('/api/knowledge/<int:asset_id>', methods=['PUT'])
 @require_role('presales', 'admin')
@@ -305,7 +307,7 @@ def update_knowledge(asset_id):
         capabilities = data.get("capabilities", "")
         
         if not name or not description:
-            return jsonify({"error": "Name and description are required"}), 400
+            return error_response("Name and description are required", status_code=400)
             
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -318,10 +320,10 @@ def update_knowledge(asset_id):
         cursor.close()
         conn.close()
         if affected == 0:
-            return jsonify({"error": "Knowledge asset not found"}), 404
-        return jsonify({"message": "Knowledge asset updated successfully"}), 200
+            return error_response("Knowledge asset not found", status_code=404)
+        return success_response({"message": "Knowledge asset updated successfully"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 @app.route('/api/knowledge/<int:asset_id>', methods=['DELETE'])
 @require_role('admin')
@@ -335,10 +337,10 @@ def delete_knowledge(asset_id):
         cursor.close()
         conn.close()
         if affected == 0:
-            return jsonify({"error": "Knowledge asset not found"}), 404
-        return jsonify({"message": f"Knowledge asset {asset_id} deleted successfully"}), 200
+            return error_response("Knowledge asset not found", status_code=404)
+        return success_response({"message": f"Knowledge asset {asset_id} deleted successfully"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 @app.route('/api/knowledge/reindex', methods=['POST'])
 @require_role('presales', 'admin')
@@ -368,9 +370,9 @@ def reindex_knowledge():
                     )
         except Exception as arango_err:
             pass  # ArangoDB optional — fallback to MySQL-only mode
-        return jsonify({"message": f"Re-indexed {len(assets)} knowledge assets into RAG vector store"}), 200
+        return success_response({"message": f"Re-indexed {len(assets)} knowledge assets into RAG vector store"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 if __name__ == '__main__':
     # Initialize the database structures

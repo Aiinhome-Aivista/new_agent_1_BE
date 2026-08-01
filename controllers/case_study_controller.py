@@ -2,10 +2,11 @@ from utils.prompts import CASE_STUDY_CONTROLLER_SYS_PROMPT_1
 import os
 import uuid
 import json
-from flask import request, jsonify
+from flask import request
 from database.db_connection import get_db_connection
 from utils.doc_extractor import extract_text
 from utils.llm_client import query_llm
+from utils.api_response import success_response, error_response
 
 # def upload_case_study():
 #     try:
@@ -79,7 +80,7 @@ def upload_case_study():
         files = request.files.getlist("files")
 
         if not files:
-            return jsonify({"error": "No files uploaded"}), 400
+            return error_response("No files uploaded", status_code=400)
 
         upload_dir = os.path.join(os.getcwd(), "static", "uploads")
         os.makedirs(upload_dir, exist_ok=True)
@@ -157,15 +158,13 @@ def upload_case_study():
         cursor.close()
         conn.close()
 
-        return jsonify({
+        return success_response({
             "message": f"{len(uploaded_projects)} case studies uploaded successfully.",
             "projects": uploaded_projects
-        }), 200
+        })
 
     except Exception as e:
-        return jsonify({
-            "error": f"Failed to upload case studies: {str(e)}"
-        }), 500
+        return error_response(f"Failed to upload case studies: {str(e)}", status_code=500)
 
         
 def get_case_studies():
@@ -191,9 +190,9 @@ def get_case_studies():
                 "created_at": str(r["created_at"]) if r["created_at"] else ""
             })
             
-        return jsonify(case_studies), 200
+        return success_response(case_studies)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
 
 def delete_case_study(id):
     try:
@@ -203,6 +202,6 @@ def delete_case_study(id):
         conn.commit()
         cursor.close()
         conn.close()
-        return jsonify({"message": "Case study deleted successfully"}), 200
+        return success_response({"message": "Case study deleted successfully"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return error_response(str(e), status_code=500)
