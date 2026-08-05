@@ -101,11 +101,11 @@ jobs:
             echo "Starting new container..."
 
             docker run -d \
-              --name ${{ env.CONTAINER_NAME }} \
-              --restart unless-stopped \
-              -p ${{ env.PORT }}:${{ env.PORT }} \
-              --env-file /root/Phase-2/AGENT_1/new_agent_1_BE/.env \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:BE_DEPLOYMENT
+            --name ${{ env.CONTAINER_NAME }} \
+            --restart unless-stopped \
+            -p ${{ env.PORT }}:${{ env.PORT }} \
+            --env-file /root/Phase-2/AGENT_1/new_agent_1_BE/.env \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
 
             echo "Checking container status..."
 
