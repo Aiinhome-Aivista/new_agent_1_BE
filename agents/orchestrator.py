@@ -17,7 +17,7 @@ from agents.requirement_agent import RequirementAgent
 
 
 def chunk_text(text, chunk_size=1000, overlap=100):
-    """Splits document text into overlapping blocks of characters."""
+    """Splits document text into overlapping blocks of characters.."""
     if not text:
         return []
     chunks = []
