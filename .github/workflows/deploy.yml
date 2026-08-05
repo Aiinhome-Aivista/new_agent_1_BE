@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - BE_DEPLOYMENT
-
+  workflow_dispatch:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: aiinhome-aivista/new_agent_1_be
@@ -44,7 +44,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=deploy-1
+            type=raw,value=BE_DEPLOYMENT
             type=sha,prefix=sha-
 
       - name: Build and Push Docker Image
@@ -88,7 +88,7 @@ jobs:
 
             echo "Pulling latest Docker image..."
 
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:deploy-1
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:BE_DEPLOYMENT
 
             echo "Stopping existing container..."
 
@@ -104,8 +104,8 @@ jobs:
               --name ${{ env.CONTAINER_NAME }} \
               --restart unless-stopped \
               -p ${{ env.PORT }}:${{ env.PORT }} \
-              --env-file /root/Phase-2/AGENT_2/new_agent_2_BE/.env \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:deploy-1
+              --env-file /root/Phase-2/AGENT_1/new_agent_1_BE/.env \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:BE_DEPLOYMENT
 
             echo "Checking container status..."
 
