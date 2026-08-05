@@ -4,12 +4,16 @@ on:
   push:
     branches:
       - BE_DEPLOYMENT
+
   workflow_dispatch:
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: aiinhome-aivista/new_agent_1_be
-  CONTAINER_NAME: new-agent-1-be
-  PORT: 3009
+  IMAGE_TAG: BE_DEPLOYMENT
+  CONTAINER_NAME: agent1-be
+  HOST_PORT: 3009
+  CONTAINER_PORT: 5000
 
 jobs:
 
@@ -25,6 +29,7 @@ jobs:
       packages: write
 
     steps:
+
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -44,7 +49,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=BE_DEPLOYMENT
+            type=raw,value=${{ env.IMAGE_TAG }}
             type=sha,prefix=sha-
 
       - name: Build and Push Docker Image
@@ -67,6 +72,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -78,41 +84,52 @@ jobs:
             set -e
 
             echo "======================================"
-            echo "Starting deployment..."
+            echo "Starting Agent 1 deployment..."
             echo "======================================"
 
-            # Login to GHCR
+            # Login to GitHub Container Registry
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io \
               -u "${{ github.actor }}" \
               --password-stdin
 
             echo "Pulling latest Docker image..."
 
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:BE_DEPLOYMENT
+            docker pull \
+              "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
 
             echo "Stopping existing container..."
 
-            docker stop ${{ env.CONTAINER_NAME }} || true
+            docker stop "${{ env.CONTAINER_NAME }}" || true
 
             echo "Removing existing container..."
 
-            docker rm ${{ env.CONTAINER_NAME }} || true
+            docker rm "${{ env.CONTAINER_NAME }}" || true
 
             echo "Starting new container..."
 
             docker run -d \
-            --name ${{ env.CONTAINER_NAME }} \
-            --restart unless-stopped \
-            -p ${{ env.PORT }}:${{ env.PORT }} \
-            --env-file /root/Phase-2/AGENT_1/new_agent_1_BE/.env \
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+              --name "${{ env.CONTAINER_NAME }}" \
+              --restart unless-stopped \
+              -p "${{ env.HOST_PORT }}:${{ env.CONTAINER_PORT }}" \
+              --env-file "/root/Phase-2/AGENT_1/new_agent_1_BE/.env" \
+              "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
+
+            echo "Waiting for application to start..."
+
+            sleep 5
 
             echo "Checking container status..."
 
             docker ps --filter "name=${{ env.CONTAINER_NAME }}"
 
-            echo "======================================"
-            echo "Deployment completed successfully!"
-            echo "======================================"
+            echo "Recent container logs..."
+
+            docker logs --tail 30 "${{ env.CONTAINER_NAME }}"
+
+            echo "Removing unused Docker images..."
 
             docker image prune -f
+
+            echo "======================================"
+            echo "Agent 1 deployment completed successfully!"
+            echo "======================================"
