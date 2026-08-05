@@ -1,4 +1,4 @@
-name: Deploy Python Backend to VPS
+name: Deploy Agent 1 Backend to VPS
 
 on:
   push:
@@ -10,8 +10,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: aiinhome-aivista/new_agent_1_be
-  IMAGE_TAG: BE_DEPLOYMENT
   CONTAINER_NAME: agent1-be
+  IMAGE_TAG: BE_DEPLOYMENT
   HOST_PORT: 3009
   CONTAINER_PORT: 5000
 
@@ -29,7 +29,6 @@ jobs:
       packages: write
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -72,7 +71,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -87,7 +85,7 @@ jobs:
             echo "Starting Agent 1 deployment..."
             echo "======================================"
 
-            # Login to GitHub Container Registry
+            # Login to GHCR
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io \
               -u "${{ github.actor }}" \
               --password-stdin
@@ -114,22 +112,12 @@ jobs:
               --env-file "/root/Phase-2/AGENT_1/new_agent_1_BE/.env" \
               "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
 
-            echo "Waiting for application to start..."
-
-            sleep 5
-
             echo "Checking container status..."
 
             docker ps --filter "name=${{ env.CONTAINER_NAME }}"
 
-            echo "Recent container logs..."
-
-            docker logs --tail 30 "${{ env.CONTAINER_NAME }}"
-
-            echo "Removing unused Docker images..."
-
-            docker image prune -f
-
             echo "======================================"
             echo "Agent 1 deployment completed successfully!"
             echo "======================================"
+
+            docker image prune -f
