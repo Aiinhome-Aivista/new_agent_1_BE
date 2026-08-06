@@ -240,6 +240,8 @@ def add_knowledge():
 
         processed_count = 0
         
+        sector = request.form.get('sector', '')
+        
         for file in files:
             if file and file.filename:
                 filename = secure_filename(file.filename)
@@ -253,7 +255,12 @@ def add_knowledge():
                 from utils.llm_client import extract_pdf_metadata
                 meta = extract_pdf_metadata(extracted_text)
                 category = meta.get("category", "Asset")
-                capabilities = meta.get("capabilities", "File Upload")
+                
+                base_capabilities = meta.get("capabilities", "File Upload")
+                # Prepend sector to capabilities so it becomes a tag
+                tags = [t for t in [sector, base_capabilities] if t]
+                capabilities = ", ".join(tags)
+                
                 description = meta.get("description", extracted_text[:200] + "...")
                 
                 # Insert into SQLite (Metadata)
@@ -265,7 +272,7 @@ def add_knowledge():
                 
                 # Store in VectorDB (ChromaDB)
                 # Note: pricing_kb.py uses default collection for search
-                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": category, "description": description})
+                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": category, "description": description, "sector": sector})
                 
                 # Store in GraphDB (ArangoDB)
                 if arango:
