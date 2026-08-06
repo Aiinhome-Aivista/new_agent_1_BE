@@ -19,22 +19,22 @@ _MISTRAL_EMBEDDING_SUPPORTED = True
 
 def _local_hash_vectorizer(text):
     """
-    Fallback vectorizer: L2-normalized 384-dimensional term frequency mapping.
+    Fallback vectorizer: L2-normalized 128-dimensional term frequency mapping.
     Uses polynomial feature hashing to guarantee deterministic and package-free vector matching.
     """
     if not text:
-        return [0.0] * 384
+        return [0.0] * 128
         
     # Preprocess text (lowercase and tokenize)
     words = text.lower().replace('\n', ' ').replace('\r', ' ').split()
-    vector = [0.0] * 384
+    vector = [0.0] * 128
     
     # Feature hashing
     for word in words:
         # Polynomial rolling hash
         h = 0
         for char in word:
-            h = (h * 31 + ord(char)) % 384
+            h = (h * 31 + ord(char)) % 128
         vector[h] += 1.0
         
     # L2 Normalization
