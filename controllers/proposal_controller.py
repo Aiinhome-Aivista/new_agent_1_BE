@@ -23,6 +23,7 @@ def upload_proposal():
         project_duration = request.form.get("project_duration")
         budget = request.form.get("budget")
         requirements_text = request.form.get("requirements_text")
+        additional_context = request.form.get("additional_context")
         
         if not client_name or client_name.strip() == "":
             client_name = "Extracting Client Name..."
@@ -81,10 +82,10 @@ def upload_proposal():
         cursor.execute("SELECT COUNT(*) FROM proposals WHERE status IN ('Ingesting', 'Analyzing', 'Designing', 'Planning', 'Assembling', 'WaitingForRateConfirmation')")
         active_count = cursor.fetchone()[0]
         status = "Queued" if active_count > 0 else "Ingesting"
-
+ 
         cursor.execute(
-            "INSERT INTO proposals (id, client_name, project_duration, budget, status, files_info, requirements_text, case_study_files, ppt_template_file) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (proposal_id, client_name, project_duration, budget, status, json.dumps(uploaded_files), requirements_text, json.dumps(uploaded_case_study_files), ppt_template_path)
+            "INSERT INTO proposals (id, client_name, project_duration, budget, status, files_info, requirements_text, case_study_files, ppt_template_file, additional_context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (proposal_id, client_name, project_duration, budget, status, json.dumps(uploaded_files), requirements_text, json.dumps(uploaded_case_study_files), ppt_template_path, additional_context)
         )
         conn.commit()
         cursor.close()
@@ -437,7 +438,7 @@ def transition_proposal_status(proposal_id):
             
         # Perform status update, record who made the transition and when
         cursor.execute(
-            "UPDATE proposals SET status = %s, submitted_by_role = %s, last_transitioned_at = NOW() WHERE id = %s",
+            "UPDATE proposals SET status = %s, submitted_by_role = %s, last_transitioned_at = CURRENT_TIMESTAMP WHERE id = %s",
             (new_status, user_role, proposal_id)
         )
         

@@ -361,6 +361,68 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                 }
                 arango_client.insert("documents", doc_record)
 
+        # Process additional_context if provided in the database
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+            cursor.execute("SELECT additional_context FROM proposals WHERE id = %s", (proposal_id,))
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if row:
+                additional_context = row.get("additional_context") if isinstance(row, dict) else row[0]
+                if additional_context and additional_context.strip():
+                    txt = f"--- Additional Context / Notes ---\n{additional_context.strip()}"
+                    orig_name = "Additional_Context"
+                    parsed_files += 1
+                    extracted_text_blocks.append(txt)
+                    
+                    # Smart Chunking and Classification
+                    chunks = chunk_text(txt, chunk_size=1000, overlap=100)
+                    from database.vector_client import store_embedding
+                    for idx, chunk in enumerate(chunks):
+                        classification = intake_agent.classify_chunk(chunk)
+                        embedding = get_embedding(chunk)
+                        chunk_id = f"{proposal_id}_{orig_name}_{idx}"
+                        
+                        # Save to ArangoDB chunks collection
+                        if arango_client.is_connected:
+                            chunk_doc = {
+                                "_key": chunk_id,
+                                "proposal_id": proposal_id,
+                                "filename": orig_name,
+                                "chunk_index": idx,
+                                "text": chunk,
+                                "classification": classification,
+                                "embedding": embedding
+                            }
+                            arango_client.insert("chunks", chunk_doc)
+                        
+                        # Save to ChromaDB
+                        store_embedding(
+                            collection_name="chunks",
+                            doc_id=chunk_id,
+                            text=chunk,
+                            metadata={
+                                "proposal_id": proposal_id,
+                                "filename": orig_name,
+                                "classification": classification
+                            }
+                        )
+                        total_chunks_stored += 1
+                    
+                    # Save document record to ArangoDB
+                    if arango_client.is_connected:
+                        doc_record = {
+                            "proposal_id": proposal_id,
+                            "filename": orig_name,
+                            "character_count": len(txt)
+                        }
+                        arango_client.insert("documents", doc_record)
+        except Exception as e:
+            print(f"Error loading additional context: {e}")
+
         # Process case study documents if provided
         structured_case_studies = []
         parsed_case_study_files = 0

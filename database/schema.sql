@@ -1,5 +1,3 @@
-CREATE DATABASE IF NOT EXISTS mydb;
-USE mydb;
 
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -28,6 +26,7 @@ CREATE TABLE IF NOT EXISTS proposals (
     case_study_files LONGTEXT NULL,
     ppt_template_file VARCHAR(500) NULL,
     draft_ir LONGTEXT NULL,
+    additional_context LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
