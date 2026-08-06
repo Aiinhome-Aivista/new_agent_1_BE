@@ -251,6 +251,17 @@ def add_knowledge():
                 # Extract text
                 extracted_text = extract_text(filepath)
                 
+                # Document Validation
+                from utils.llm_client import validate_document
+                is_approved, res_json = validate_document(extracted_text)
+                if not is_approved:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    cursor.close()
+                    conn.close()
+                    from flask import jsonify
+                    return jsonify(res_json), 400
+                
                 # Dynamic metadata extraction using LLM
                 from utils.llm_client import extract_pdf_metadata
                 meta = extract_pdf_metadata(extracted_text)
@@ -297,7 +308,8 @@ def add_knowledge():
         cursor.close()
         conn.close()
         
-        return success_response({"message": f"Successfully uploaded and indexed {processed_count} files"}, status_code=201)
+        from flask import jsonify
+        return jsonify(res_json), 201
     except Exception as e:
         import traceback
         traceback.print_exc()

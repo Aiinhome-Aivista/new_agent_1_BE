@@ -45,6 +45,25 @@ def upload_proposal():
                 safe_name = f"{uuid.uuid4()}_{file.filename}"
                 save_path = os.path.join(upload_dir, safe_name)
                 file.save(save_path)
+                
+                # Extract text for validation
+                from utils.doc_extractor import extract_text
+                extracted_text = extract_text(save_path)
+                
+                # Document Validation
+                from utils.llm_client import validate_document
+                is_approved, res_json = validate_document(extracted_text)
+                if not is_approved:
+                    # Remove current file
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                    # Clean up other files uploaded in this request
+                    for uf in uploaded_files:
+                        if os.path.exists(uf["saved_path"]):
+                            os.remove(uf["saved_path"])
+                    from flask import jsonify
+                    return jsonify(res_json), 400
+                
                 uploaded_files.append({
                     "original_name": file.filename,
                     "saved_path": save_path
@@ -58,6 +77,28 @@ def upload_proposal():
                 safe_name = f"{uuid.uuid4()}_{file.filename}"
                 save_path = os.path.join(upload_dir, safe_name)
                 file.save(save_path)
+                
+                # Extract text for validation
+                from utils.doc_extractor import extract_text
+                extracted_text = extract_text(save_path)
+                
+                # Document Validation
+                from utils.llm_client import validate_document
+                is_approved, res_json = validate_document(extracted_text)
+                if not is_approved:
+                    # Remove current file
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                    # Clean up other files uploaded in this request
+                    for uf in uploaded_files:
+                        if os.path.exists(uf["saved_path"]):
+                            os.remove(uf["saved_path"])
+                    for uf in uploaded_case_study_files:
+                        if os.path.exists(uf["saved_path"]):
+                            os.remove(uf["saved_path"])
+                    from flask import jsonify
+                    return jsonify(res_json), 400
+                
                 uploaded_case_study_files.append({
                     "original_name": file.filename,
                     "saved_path": save_path

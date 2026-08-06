@@ -192,3 +192,61 @@ def extract_pdf_metadata(text):
         "description": text[:200] + "..." if len(text) > 200 else text
     }
 
+def validate_document(extracted_text):
+    """
+    Validates if the extracted text of an uploaded document is relevant to the application's domain.
+    Returns a tuple (is_approved, response_json).
+    """
+    threshold = int(os.environ.get("RELEVANCE_THRESHOLD", "80"))
+    system_prompt = f"""You are an intelligent document validation assistant.
+Your task is to determine whether an uploaded document is relevant to the application's domain (IT Solutions, Software Development Proposals, RFP responses, project requirements specifications, technical case studies, software architectures, and technology competency profiles) before it is stored in the knowledge base.
+
+Instructions:
+1. Compare the document with the expected domain/context of the application.
+2. IMPORTANT rules for scoring:
+   - The document must be an organizational asset (such as an RFP, corporate proposal, business case study, technical architecture, or capability overview).
+   - EXCLUDE personal resumes, CVs (Curriculum Vitae), career history, portfolios, cover letters, and individual bio profiles. Even if they list IT technologies or software engineering skills, they are NOT relevant to the proposal creation or knowledge base domain and MUST be REJECTED (relevance_score must be below {threshold}, ideally 0-40%).
+   - EXCLUDE any non-IT documents (e.g. recipes, non-IT articles, news, fiction, general blogs).
+3. Calculate a relevance score between 0 and 100%. Be conservative and strict.
+4. The minimum acceptance threshold is: {threshold}
+
+Decision Rules:
+- If relevance_score >= {threshold}:
+    status = "APPROVED"
+- If relevance_score < {threshold}:
+    status = "REJECTED"
+
+Return your response strictly in the following JSON format:
+{{
+  "status": "APPROVED" or "REJECTED",
+  "relevance_score": <integer score>,
+  "threshold": {threshold},
+  "reason": "Brief explanation of why the document is or is not relevant, explicitly mentioning if it is a personal CV/resume.",
+  "matched_topics": ["Topic 1", "Topic 2"],
+  "missing_topics": ["Topic A", "Topic B"]
+}}
+"""
+    user_prompt = f"Document content:\n\n{extracted_text[:6000]}"
+    res_str = query_llm(system_prompt, user_prompt, temperature=0.1, json_mode=True)
+    res_json = safe_json_loads(res_str, None)
+    
+    if not res_json:
+        res_json = {
+            "status": "REJECTED",
+            "relevance_score": 0,
+            "threshold": threshold,
+            "reason": "Failed to parse validation response from LLM.",
+            "matched_topics": [],
+            "missing_topics": []
+        }
+        
+    status_decision = res_json.get("status", "REJECTED")
+    relevance_score = res_json.get("relevance_score", 0)
+    
+    if relevance_score < threshold:
+        status_decision = "REJECTED"
+        res_json["status"] = "REJECTED"
+        
+    return (status_decision == "APPROVED", res_json)
+
+

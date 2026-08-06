@@ -103,6 +103,17 @@ def upload_case_study():
 
             if not text or not text.strip():
                 continue
+                
+            # Document Validation
+            from utils.llm_client import validate_document
+            is_approved, res_json = validate_document(text)
+            if not is_approved:
+                if os.path.exists(save_path):
+                    os.remove(save_path)
+                cursor.close()
+                conn.close()
+                from flask import jsonify
+                return jsonify(res_json), 400
 
             sys_prompt = CASE_STUDY_CONTROLLER_SYS_PROMPT_1
 
@@ -158,10 +169,8 @@ def upload_case_study():
         cursor.close()
         conn.close()
 
-        return success_response({
-            "message": f"{len(uploaded_projects)} case studies uploaded successfully.",
-            "projects": uploaded_projects
-        })
+        from flask import jsonify
+        return jsonify(res_json), 201
 
     except Exception as e:
         return error_response(f"Failed to upload case studies: {str(e)}", status_code=500)
