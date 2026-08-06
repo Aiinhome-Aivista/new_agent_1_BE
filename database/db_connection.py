@@ -198,6 +198,10 @@ def init_db():
         )
         cursor = conn.cursor()
         
+        db_name = os.getenv("MYSQL_NAME", "mydb")
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+        cursor.execute(f"USE {db_name}")
+        
         # Read and execute schema file
         schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
         if os.path.exists(schema_path):
