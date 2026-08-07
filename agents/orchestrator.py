@@ -540,7 +540,8 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "guardrail_options": advanced_options.get("guardrail_options", []),
             "case_study_text": full_case_study_text,
             "structured_case_studies": structured_case_studies,
-            "ppt_template_path": ppt_template_path
+            "ppt_template_path": ppt_template_path,
+            "full_document_text": full_document_text[:10000]
         }
         update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
         
@@ -591,6 +592,17 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         structured_case_studies = partial_state.get("structured_case_studies", [])
         ppt_template_path = partial_state.get("ppt_template_path", None)
         
+        full_document_text = partial_state.get("full_document_text", "")
+        if not full_document_text and files_info:
+            extracted_texts = []
+            for file_data in files_info:
+                saved_path = file_data.get("saved_path")
+                if saved_path and os.path.exists(saved_path):
+                    txt = extract_text(saved_path)
+                    if txt:
+                        extracted_texts.append(txt)
+            full_document_text = "\n\n".join(extracted_texts).strip()
+
         # Retrieve persistent case studies from DB
         db_case_study_text = ""
         db_case_studies_list = []
@@ -640,7 +652,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             selected_rag=selected_rag,
             selected_guardrail=selected_guardrail,
             selected_action_engine=selected_action_engine,
-            case_study_text=combined_case_study_text
+            case_study_text=combined_case_study_text,
+            full_rfp_text=full_document_text[:6000]
         )
         solution_pillars = design_data.get("solution_pillars", [])
         architecture = design_data.get("architecture", [])

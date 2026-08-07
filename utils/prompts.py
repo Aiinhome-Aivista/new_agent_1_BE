@@ -184,10 +184,24 @@ DESIGN_AGENT_PROMPT_0 = ChatPromptTemplate.from_messages([
                 "  * 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing the technical architecture of that case study.\n"
                 "  * 'tech_architecture_explanation': a list of exactly 3 strings representing extremely short and concise summaries (exactly 1 sentence, maximum 12 words per summary) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting. They must fit in a very small box.\n"
                 "  * 'key_technologies': a list of exactly 3-4 technologies used (e.g. ['Snowflake', 'Azure Data Factory']).\n"
-                "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
+                "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n"
+                "- 'complex_diagrams': a list of exactly 2 objects representing logical system architecture diagrams for the proposed client solution (NOT the proposal creator app itself). "
+                "The first object must be for the Logical Reference Architecture (title: 'Reference Architecture') representing the logical end-to-end data/component flow of the proposed solution. "
+                "The second object must be for the Cloud Native Deployment Landscape (title: 'Landscape Architecture') representing the topology of the proposed solution on the selected cloud platform (e.g. AWS, Azure, or GCP). "
+                "Each object must have these keys:\n"
+                "  * 'title': the title of the diagram.\n"
+                "  * 'mermaid_code': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing that specific architecture of the proposed solution. Follow these strict syntax rules:\n"
+                "    1. Start with 'graph LR'.\n"
+                "    2. Use clear, alphanumeric node IDs (e.g., UI, API, DB).\n"
+                "    3. Enclose all text labels in double quotes (e.g., UI[\"Web UI (React)\"] or DB[(\"PostgreSQL Database\")]) to avoid rendering errors. Do NOT use brackets or parentheses without double quotes around the label text inside the node.\n"
+                "    4. Use standard connectors like --> and subgraph boxes for different layers (e.g. Ingestion, Compute, Storage).\n"
+                "    5. Do NOT include style declarations, class definitions, or CSS inside the Mermaid code.\n"
+                "    6. THE DIAGRAMS MUST BE COMPLETELY DIFFERENT: The 'Reference Architecture' diagram must show generic, logical tiers and data ingestion/processing pipelines (e.g. 'API Gateway', 'Core API Server', 'Cache', 'Object Storage', 'Vector Database', 'Message Queue', 'Auth Service'). "
+                "The 'Landscape Architecture' diagram must map these logical components to actual cloud-native deployment resources of the target cloud provider (identify the provider from the RFP text, e.g. AWS, Azure, or GCP, defaulting to Azure if not specified). E.g. for Azure use 'Azure API Management', 'Azure App Service', 'Azure Cache for Redis', 'Azure Blob Storage', 'Azure Cognitive Search', 'Azure Monitor', organized in clean subgraphs representing VPC/VNet zones, API layer, database layer, and monitoring.\n"
+                "    7. BE DETAILED: Make the flowcharts comprehensive (at least 6-10 nodes each) reflecting the specific needs in the RFP document context (e.g., if database migration is requested, show source systems, transfer utility, target cloud database; if RAG is requested, show document ingestion, vector storage, LLM orchestration, client UI).\n\n"
                 "Do not include any explanation or markdown formatting outside the JSON."
             )),
-            ("user", "Requirements:\n{requirements}\n\nBudget: {budget}\nDuration: {duration}\n\nCase Study Documents Text:\n{case_study_text}")
+            ("user", "Requirements:\n{requirements}\n\nFull RFP Document Text Snippet:\n{full_rfp_text}\n\nBudget: {budget}\nDuration: {duration}\n\nCase Study Documents Text:\n{case_study_text}")
         ])
 # Extracted from orchestrator.py
 ORCHESTRATOR_SYS_PROMPT_0 = (
