@@ -138,6 +138,11 @@ def get_tech_options():
 def calculate_budget():
     return proposal_controller.calculate_budget()
 
+@app.route('/api/generate-question', methods=['POST'])
+def handle_generate_question():
+    from controllers.proposal_controller import generate_question
+    return generate_question()
+
 @app.route('/api/proposals/resume/<proposal_id>', methods=['POST'])
 @require_role('presales', 'bidmanager', 'admin')
 def resume_proposal(proposal_id):
