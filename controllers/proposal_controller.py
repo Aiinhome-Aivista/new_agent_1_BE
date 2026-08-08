@@ -1,7 +1,7 @@
 import os
 import uuid
 import json
-from flask import request, send_file
+from flask import request, send_file, jsonify
 from database.db_connection import get_db_connection
 from agents.orchestrator import trigger_proposal_job, STEPS, update_step_status
 from utils.pptx_generator import generate_pptx
@@ -16,6 +16,65 @@ def format_datetime(val):
         return val.strftime("%Y-%m-%d %H:%M:%S")
     except Exception:
         return str(val)
+
+def generate_question():
+    try:
+        data = request.get_json()
+        context = data.get('context', {})
+        history = data.get('history', [])
+        question_index = data.get('questionIndex', 1)
+        
+        system_prompt = f"""You are an intelligent proposal scoping assistant.
+Your task is to ask the user a relevant, single follow-up question to gather more context about their project proposal.
+The user is at question {question_index} out of 5.
+
+CRITICAL INSTRUCTIONS:
+1. You MUST ask a completely DIFFERENT question from the ones in the Q&A history.
+2. Focus on ONE of these topics, choosing a topic that hasn't been discussed yet:
+   - Is this for a Short term or Long term goal?
+   - Is there any specific SLA (Service Level Agreement) required for support, or no SLA?
+   - What is the strict time to market or expected deadline?
+   - Are there strict budget constraints?
+   - Specific technical capabilities or vendor choices.
+3. Keep the question very concise (1 sentence max).
+4. Do NOT ask generic questions like "Could you provide more context?".
+
+Return your response strictly as a JSON object:
+{{
+    "question": "The question text here"
+}}
+"""
+        
+        history_text = ""
+        for idx, qa in enumerate(history):
+            history_text += f"Q{idx+1}: {qa.get('question')}\nA: {qa.get('answer')}\n\n"
+            
+        user_prompt = f"""
+Current Context:
+Client Name: {context.get('clientName', 'N/A')}
+Project Duration: {context.get('projectDuration', 'N/A')}
+Budget: {context.get('budget', 'N/A')}
+Requirements Summary: {str(context.get('requirementsText', 'N/A'))[:500]}
+
+Previous Q&A History:
+{history_text if history_text else "None so far."}
+
+Generate the next question to ask the user.
+"""
+        
+        from utils.llm_client import query_llm, safe_json_loads
+        res_str = query_llm(system_prompt, user_prompt, temperature=0.6, max_tokens=150)
+        
+        res_json = safe_json_loads(res_str, {"question": "Based on your requirements, what is the primary business outcome you are expecting?"})
+        
+        # If the LLM returned a completely empty question, use a dynamic-sounding default
+        if not res_json.get("question") or len(res_json.get("question", "")) < 5:
+            res_json["question"] = "What are the most critical success factors for this project?"
+        
+        return jsonify({"success": True, "data": res_json})
+    except Exception as e:
+        print(f"Error generating question: {e}")
+        return jsonify({"success": False, "data": {"question": "Could you elaborate on the technical constraints for this project?"}}), 500
 
 def upload_proposal():
     try:
