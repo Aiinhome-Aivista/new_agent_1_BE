@@ -45,6 +45,16 @@ def _local_hash_vectorizer(text, dimension=384):
     return vector
 
 def get_embedding(text, dimension=384):
+    emb = _get_embedding_raw(text, dimension=dimension)
+    if hasattr(emb, "tolist"):
+        emb = emb.tolist()
+    elif hasattr(emb, "numpy"):
+        emb = emb.numpy().tolist()
+    elif isinstance(emb, list):
+        emb = [float(x) for x in emb]
+    return emb
+
+def _get_embedding_raw(text, dimension=384):
     """
     Fetches embedding from local Mistral server, falling back to Chroma's default embedding function,
     and finally to a local hash vectorizer of the requested dimension if everything else fails.
