@@ -26,18 +26,14 @@ def generate_question():
         
         system_prompt = f"""You are an intelligent proposal scoping assistant.
 Your task is to ask the user a relevant, single follow-up question to gather more context about their project proposal.
-The user is at question {question_index} out of 5.
+The user is at question {question_index} out of 10.
 
 CRITICAL INSTRUCTIONS:
 1. You MUST ask a completely DIFFERENT question from the ones in the Q&A history.
-2. Focus on ONE of these topics, choosing a topic that hasn't been discussed yet:
-   - Is this for a Short term or Long term goal?
-   - Is there any specific SLA (Service Level Agreement) required for support, or no SLA?
-   - What is the strict time to market or expected deadline?
-   - Are there strict budget constraints?
-   - Specific technical capabilities or vendor choices.
-3. Keep the question very concise (1 sentence max).
-4. Do NOT ask generic questions like "Could you provide more context?".
+2. Analyze the provided Context and Q&A history to deeply understand what critical information is still missing.
+3. Determine the most important missing details needed to scope the project effectively and create a comprehensive PPT presentation (e.g., specific goals, tech stack preferences, success metrics, constraints, target audience, key deliverables).
+4. Ask a highly targeted and precise question to obtain this specific missing information. Do NOT ask generic questions like "Could you provide more context?".
+5. Keep the question very concise (1 sentence max).
 
 Return your response strictly as a JSON object:
 {{
