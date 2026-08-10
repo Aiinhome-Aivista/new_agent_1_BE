@@ -181,14 +181,14 @@ def extract_pdf_metadata(text):
         if response:
             return safe_json_loads(response, {
                 "category": "Asset",
-                "capabilities": "File Upload",
+                "tags": ["File Upload"],
                 "description": text[:200] + "..." if len(text) > 200 else text
             })
     except Exception as e:
         print(f"Error extracting metadata from PDF: {e}")
     return {
         "category": "Asset",
-        "capabilities": "File Upload",
+        "tags": ["File Upload"],
         "description": text[:200] + "..." if len(text) > 200 else text
     }
 

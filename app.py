@@ -245,7 +245,7 @@ def add_knowledge():
 
         processed_count = 0
         
-        sector = request.form.get('sector', '')
+
         
         for file in files:
             if file and file.filename:
@@ -272,10 +272,10 @@ def add_knowledge():
                 meta = extract_pdf_metadata(extracted_text)
                 category = meta.get("category", "Asset")
                 
-                base_capabilities = meta.get("capabilities", "File Upload")
-                # Prepend sector to capabilities so it becomes a tag
-                tags = [t for t in [sector, base_capabilities] if t]
-                capabilities = ", ".join(tags)
+                raw_tags = meta.get("tags", [])
+                # Filter out any empty strings or nulls and deduplicate
+                valid_tags = list(set([str(t).strip() for t in raw_tags if t and str(t).strip()]))
+                capabilities = ", ".join(valid_tags)
                 
                 description = meta.get("description", extracted_text[:200] + "...")
                 
@@ -288,7 +288,7 @@ def add_knowledge():
                 
                 # Store in VectorDB (ChromaDB)
                 # Note: pricing_kb.py uses default collection for search
-                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": category, "description": description, "sector": sector})
+                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": category, "description": description, "capabilities": capabilities})
                 
                 # Store in GraphDB (ArangoDB)
                 if arango:
