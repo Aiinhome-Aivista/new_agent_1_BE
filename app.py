@@ -120,6 +120,11 @@ def edit_proposal_ir(proposal_id):
     # partner is read-only — cannot save changes
     return proposal_controller.edit_proposal_ir(proposal_id)
 
+@app.route('/api/proposals/refine-slide', methods=['POST'], strict_slashes=False)
+@app.route('/api/proposals/refine-slide/', methods=['POST'], strict_slashes=False)
+def refine_proposal_slide():
+    return proposal_controller.refine_proposal_slide()
+
 @app.route('/api/proposals/download/<proposal_id>', methods=['GET'])
 def download_proposal_pptx(proposal_id):
     # All roles can download
