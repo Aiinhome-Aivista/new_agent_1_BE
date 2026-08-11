@@ -813,13 +813,15 @@ def refine_proposal_slide():
         sys_prompt = (
             "You are an expert AI PPT Executive Editor & Context-Aware Strong Design Agent.\n"
             "Your task is to dynamically analyze the current slide content and modify, explain, enhance, format, or replace the content of the PPT slide based on user natural language instructions.\n\n"
-            "Context-Aware Rules:\n"
-            "1. Read the 'Current Content On Slide' carefully. If user asks to 'explain', 'elaborate', or 'detail', expand each existing bullet point with detailed technical execution, business impact, and sub-points.\n"
-            "2. If user asks to make content 'business-oriented' or 'professional', transform each existing point on the slide into high-impact corporate executive statements with ROI and compliance metrics.\n"
-            "3. If user asks to 'replace' or provides revised text, strip out prompt command prefixes (e.g. 'Please replace existing content...') and set the slide's field cleanly to the revised bullet points.\n"
-            "4. Respond strictly in JSON format with keys:\n"
-            "   - 'reply': A short, clear confirmation message explaining what was modified (1-2 sentences).\n"
-            "   - 'updated_ir': The full updated structured JSON IR dictionary.\n"
+            "Real-Time Validation & Correction Rules:\n"
+            "1. Read the user's natural language instruction carefully. If it is gibberish, meaningless (e.g., 'asdfasdf', 'ghjkhjk', '12345'), contains random characters, or is completely unclear/unrelated to editing the slides, you MUST NOT modify the IR (set 'updated_ir' to the exact input structured_ir) and set 'reply' to a polite message in English asking the user to write their request clearly/properly (e.g., ' Please write your instructions clearly so that I can update the slide properly.').\n"
+            "2. If the user's instruction is valid but you're not sure which slide to apply it to, apply it contextually to the target slide number/title provided.\n"
+            "3. If user asks to 'explain', 'elaborate', or 'detail', expand each existing bullet point with detailed technical execution, business impact, and sub-points.\n"
+            "4. If user asks to make content 'business-oriented' or 'professional', transform each existing point on the slide into high-impact corporate executive statements with ROI and compliance metrics.\n"
+            "5. If user asks to 'replace' or provides revised text, strip out prompt command prefixes (e.g. 'Please replace existing content...') and set the slide's field cleanly to the revised bullet points.\n"
+            "6. Respond strictly in JSON format with keys:\n"
+            "   - 'reply': A short, clear confirmation message explaining what was modified (or validation warning if input was unclear/gibberish).\n"
+            "   - 'updated_ir': A dictionary containing the modified keys from the structured JSON IR. You can return ONLY the modified keys (and their updated values) or the full updated IR. Any unmodified keys will be automatically preserved on the server.\n"
         )
 
         user_prompt = f"""
@@ -830,9 +832,17 @@ Target Slide Title: "{slide_title}"
 Current Content On Target Slide:
 {json.dumps(current_content, indent=2) if current_content else "N/A"}
 
+Available Keys in the Structured IR: {list(structured_ir.keys())}
+
 User Natural Language Instruction: "{instruction}"
 
 Apply the requested modification contextually to Slide {slide_number} ("{slide_title}") or relevant fields in the structured IR.
+IMPORTANT: You MUST map the modified content to the matching key from the 'Available Keys' list above. For example:
+- Use 'business_summary' for Slide 2 (Business Summary).
+- Use 'requirements' for Slide 3 (Client Requirements).
+- Use 'gaps' for Slide 4 (Capability Gaps).
+If the user asks to display a summary in points/bullets, return the summary text as bullet points starting with '•' (e.g. "• Point 1\n• Point 2").
+Do NOT invent new keys like 'executive_summary' or 'summary_points'.
 Ensure the returned JSON is valid and complete.
 """
 
@@ -840,11 +850,14 @@ Ensure the returned JSON is valid and complete.
         try:
             from utils.llm_client import query_llm, safe_json_loads
             res_str = query_llm(sys_prompt, user_prompt, temperature=0.2, json_mode=True)
-            res_json = safe_json_loads(res_str)
+            res_json = safe_json_loads(res_str, None)
             if res_json and "updated_ir" in res_json and isinstance(res_json["updated_ir"], dict):
+                # Merge the LLM's updated keys with the original structured_ir to preserve all unmodified slides
+                merged_ir = copy.deepcopy(structured_ir)
+                merged_ir.update(res_json["updated_ir"])
                 return success_response({
                     "reply": res_json.get("reply", f"Successfully updated Slide {slide_number} based on your instruction!"),
-                    "updated_ir": res_json["updated_ir"]
+                    "updated_ir": merged_ir
                 })
         except Exception as llm_err:
             print("LLM refinement error (falling back to Context-Aware Strong Agent Transformer):", llm_err)
@@ -853,6 +866,17 @@ Ensure the returned JSON is valid and complete.
         updated_ir = copy.deepcopy(structured_ir)
         instr_lower = instruction.lower()
         reply = f"Updated Slide {slide_number} based on your instruction!"
+
+        # Gibberish / invalid input check
+        is_gibberish = re.match(r'^[a-z0-9]+$', instr_lower) and len(instr_lower) > 4 and not any(k in instr_lower for k in ["explain", "detail", "expand", "update", "delete", "remove", "change", "modify", "insert", "create", "rename", "title", "infra", "costs", "redis", "mysql", "mongo", "react", "axios", "summary", "requirement", "gap", "pillar", "flow"])
+        has_no_spaces = " " not in instr_lower
+        is_invalid_gibberish = is_gibberish or (has_no_spaces and len(instr_lower) > 6 and instr_lower not in ["requirements", "infrastructure", "architecture"])
+
+        if is_invalid_gibberish:
+            return success_response({
+                "reply": "অনুগ্রহ করে আপনার নির্দেশনাটি পরিষ্কারভাবে লিখুন যাতে আমি স্লাইডটি সঠিকভাবে আপডেট করতে পারি। / Please write your instructions clearly so that I can update the slide properly.",
+                "updated_ir": structured_ir
+            })
 
         # Check Intent Categories
         is_explain = any(k in instr_lower for k in ["explain", "elaborate", "detail", "expand", "this point", "poper explain", "clarify"])
