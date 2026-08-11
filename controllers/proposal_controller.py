@@ -819,7 +819,8 @@ def refine_proposal_slide():
             "3. If user asks to 'explain', 'elaborate', or 'detail', expand each existing bullet point with detailed technical execution, business impact, and sub-points.\n"
             "4. If user asks to make content 'business-oriented' or 'professional', transform each existing point on the slide into high-impact corporate executive statements with ROI and compliance metrics.\n"
             "5. If user asks to 'replace' or provides revised text, strip out prompt command prefixes (e.g. 'Please replace existing content...') and set the slide's field cleanly to the revised bullet points.\n"
-            "6. Respond strictly in JSON format with keys:\n"
+            "6. If you are modifying a diagram, edit the Mermaid syntax string inside the corresponding item in the 'complex_diagrams' list. Keep the Mermaid graph syntax valid and clean.\n"
+            "7. Respond strictly in JSON format with keys:\n"
             "   - 'reply': A short, clear confirmation message explaining what was modified (or validation warning if input was unclear/gibberish).\n"
             "   - 'updated_ir': A dictionary containing the modified keys from the structured JSON IR. You can return ONLY the modified keys (and their updated values) or the full updated IR. Any unmodified keys will be automatically preserved on the server.\n"
         )
@@ -829,7 +830,7 @@ Current Proposal Title: {structured_ir.get('proposal_title', '')}
 Target Client Name: {structured_ir.get('client_name', 'Client')}
 Target Slide Number: Slide {slide_number}
 Target Slide Title: "{slide_title}"
-Current Content On Target Slide:
+Current Content On Target Slide (this is the existing data to be modified):
 {json.dumps(current_content, indent=2) if current_content else "N/A"}
 
 Available Keys in the Structured IR: {list(structured_ir.keys())}
@@ -841,6 +842,7 @@ IMPORTANT: You MUST map the modified content to the matching key from the 'Avail
 - Use 'business_summary' for Slide 2 (Business Summary).
 - Use 'requirements' for Slide 3 (Client Requirements).
 - Use 'gaps' for Slide 4 (Capability Gaps).
+- Use 'complex_diagrams' for Slide 12 (Reference Architecture Diagram) or Slide 13 (Landscape Architecture Diagram). For these diagrams, update the Mermaid syntax string inside the corresponding diagram item (matching by title).
 If the user asks to display a summary in points/bullets, return the summary text as bullet points starting with '•' (e.g. "• Point 1\n• Point 2").
 Do NOT invent new keys like 'executive_summary' or 'summary_points'.
 Ensure the returned JSON is valid and complete.
@@ -851,10 +853,82 @@ Ensure the returned JSON is valid and complete.
             from utils.llm_client import query_llm, safe_json_loads
             res_str = query_llm(sys_prompt, user_prompt, temperature=0.2, json_mode=True)
             res_json = safe_json_loads(res_str, None)
+            import os
+            debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "debug_refine.json")
+            with open(debug_path, "w", encoding="utf-8") as debug_file:
+                json.dump({
+                    "res_str": res_str,
+                    "res_json": res_json,
+                    "slide_title": slide_title,
+                    "slide_number": slide_number,
+                    "instruction": instruction
+                }, debug_file, indent=2)
             if res_json and "updated_ir" in res_json and isinstance(res_json["updated_ir"], dict):
+                res_ir = res_json["updated_ir"]
+                
+                # Normalize LLM output: if the LLM returned mermaid_code directly under updated_ir
+                # also include keys that look like slide titles/headers
+                mermaid_keys = ["mermaid_code", "mermaidCode", "mermaid_diagram", "mermaid"]
+                for k, v in list(res_ir.items()):
+                    k_lower = k.lower()
+                    if isinstance(v, str) and ("architecture" in k_lower or "diagram" in k_lower or "reference" in k_lower or "landscape" in k_lower or "topology" in k_lower):
+                        if k not in mermaid_keys:
+                            mermaid_keys.append(k)
+                
+                found_mermaid = None
+                for m_key in mermaid_keys:
+                    if m_key in res_ir and isinstance(res_ir[m_key], str):
+                        found_mermaid = res_ir[m_key]
+                        break
+                
+                if found_mermaid:
+                    target_title = "Reference Architecture"
+                    if slide_number == 13 or "landscape" in slide_title.lower() or "cloud" in slide_title.lower():
+                        target_title = "Landscape Architecture"
+                    
+                    res_ir["complex_diagrams"] = [
+                        {
+                            "title": target_title,
+                            "mermaid_code": found_mermaid
+                        }
+                    ]
+                    for m_key in mermaid_keys:
+                        res_ir.pop(m_key, None)
+                
+                if "complex_diagrams" in res_ir and isinstance(res_ir["complex_diagrams"], dict):
+                    res_ir["complex_diagrams"] = [res_ir["complex_diagrams"]]
+
                 # Merge the LLM's updated keys with the original structured_ir to preserve all unmodified slides
                 merged_ir = copy.deepcopy(structured_ir)
-                merged_ir.update(res_json["updated_ir"])
+                
+                # Target diagram title for active slide
+                expected_title = "Reference Architecture"
+                if slide_number == 13 or "landscape" in slide_title.lower() or "cloud" in slide_title.lower():
+                    expected_title = "Landscape Architecture"
+
+                for key, val in res_ir.items():
+                    # Smart merge for complex_diagrams list of dicts to avoid deleting unmodified diagrams
+                    if key == "complex_diagrams" and isinstance(val, list) and isinstance(merged_ir.get("complex_diagrams"), list):
+                        existing_diagrams = {d.get("title", "").lower(): d for d in merged_ir["complex_diagrams"]}
+                        for new_d in val:
+                            # Normalize internal keys of the diagram dictionary
+                            # If the LLM returned 'diagram', 'mermaid', 'code', etc. inside the dictionary, map it to 'mermaid_code'
+                            diag_keys = ["mermaid_code", "mermaidCode", "mermaid_diagram", "mermaid", "diagram", "code", "mermaid_syntax"]
+                            for dk in diag_keys:
+                                if dk in new_d and dk != "mermaid_code":
+                                    new_d["mermaid_code"] = new_d[dk]
+                                    new_d.pop(dk, None)
+                                    
+                            # Force the title to match the active slide's target title to avoid LLM hallucinated title mismatch
+                            new_d["title"] = expected_title
+                            t_lower = expected_title.lower()
+                            if t_lower in existing_diagrams:
+                                existing_diagrams[t_lower].update(new_d)
+                            else:
+                                merged_ir["complex_diagrams"].append(new_d)
+                    else:
+                        merged_ir[key] = val
+
                 return success_response({
                     "reply": res_json.get("reply", f"Successfully updated Slide {slide_number} based on your instruction!"),
                     "updated_ir": merged_ir
