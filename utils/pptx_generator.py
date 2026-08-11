@@ -323,11 +323,13 @@ def add_reference_architecture_slide(slide, prs, data):
     add_footer(slide)
 
     mermaid_code = None
+    description = None
     if data:
         complex_diags = data.get("complex_diagrams", [])
         for diag in complex_diags:
             if diag.get("title", "").lower() == "reference architecture":
                 mermaid_code = diag.get("mermaid_code")
+                description = diag.get("description")
                 break
 
     is_dynamic = False
@@ -415,15 +417,43 @@ def add_reference_architecture_slide(slide, prs, data):
             "    CC --> HRI\n"
         )
 
-    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(9), Inches(0.4))
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(9), Inches(0.4))
     p = txBox.text_frame.paragraphs[0]
     p.text = "Logical Reference Architecture & Component Topology" if is_dynamic else "System Data Flow & Orchestration Architecture"
-    set_font(p.runs[0], size=16, bold=True, color=CHARCOAL)
+    set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
+
+    # Calculate Y-coordinate limits based on whether description is present
+    img_top = Inches(1.5)
+    img_height = Inches(5.5)
+
+    if description:
+        # Render description text box
+        desc_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.4), Inches(9.0), Inches(0.8))
+        tf = desc_box.text_frame
+        tf.word_wrap = True
+        tf.margin_top = Inches(0)
+        tf.margin_bottom = Inches(0)
+        tf.margin_left = Inches(0)
+        tf.margin_right = Inches(0)
+        
+        # Split description by newline and add paragraph for each bullet point
+        desc_paragraphs = [line.strip() for line in description.split("\n") if line.strip()]
+        for idx, text in enumerate(desc_paragraphs):
+            if idx == 0:
+                p_desc = tf.paragraphs[0]
+            else:
+                p_desc = tf.add_paragraph()
+            p_desc.text = text
+            set_font(p_desc.runs[0], size=10, color=CHARCOAL)
+            p_desc.space_after = Pt(2)
+            
+        img_top = Inches(2.3)
+        img_height = Inches(4.7)
 
     temp_img_path = render_mermaid_to_image(mermaid_code)
     if temp_img_path and os.path.exists(temp_img_path):
         try:
-            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.5), Inches(9.6), Inches(5.5))
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), img_top, Inches(9.6), img_height)
         except Exception as e:
             print(f"Failed to add mermaid image to Reference Architecture slide: {e}")
         finally:
@@ -450,12 +480,14 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
     add_footer(slide)
         
     mermaid_code = None
+    description = None
     if data:
         complex_diags = data.get("complex_diagrams", [])
         for diag in complex_diags:
             title_l = diag.get("title", "").lower()
             if "landscape" in title_l or "cloud" in title_l:
                 mermaid_code = diag.get("mermaid_code")
+                description = diag.get("description")
                 break
 
     is_dynamic = False
@@ -519,15 +551,43 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
             "    AKS --> Search\n"
         )
 
-    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(9), Inches(0.4))
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(9), Inches(0.4))
     p = txBox.text_frame.paragraphs[0]
     p.text = f"{cloud_name} Cloud Native Deployment Topology"
-    set_font(p.runs[0], size=16, bold=True, color=CHARCOAL)
+    set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
+
+    # Calculate Y-coordinate limits based on whether description is present
+    img_top = Inches(1.5)
+    img_height = Inches(5.5)
+
+    if description:
+        # Render description text box
+        desc_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.4), Inches(9.0), Inches(0.8))
+        tf = desc_box.text_frame
+        tf.word_wrap = True
+        tf.margin_top = Inches(0)
+        tf.margin_bottom = Inches(0)
+        tf.margin_left = Inches(0)
+        tf.margin_right = Inches(0)
+        
+        # Split description by newline and add paragraph for each bullet point
+        desc_paragraphs = [line.strip() for line in description.split("\n") if line.strip()]
+        for idx, text in enumerate(desc_paragraphs):
+            if idx == 0:
+                p_desc = tf.paragraphs[0]
+            else:
+                p_desc = tf.add_paragraph()
+            p_desc.text = text
+            set_font(p_desc.runs[0], size=10, color=CHARCOAL)
+            p_desc.space_after = Pt(2)
+            
+        img_top = Inches(2.3)
+        img_height = Inches(4.7)
 
     temp_img_path = render_mermaid_to_image(mermaid_code)
     if temp_img_path and os.path.exists(temp_img_path):
         try:
-            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.5), Inches(9.6), Inches(5.5))
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), img_top, Inches(9.6), img_height)
         except Exception as e:
             print(f"Failed to add mermaid image to Landscape slide: {e}")
         finally:
