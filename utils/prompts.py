@@ -255,8 +255,8 @@ LLM_CLIENT_SYS_PROMPT_0 = (
         "You are an assistant that analyzes technical documents or competencies.\n"
         "Extract the following metadata from the text:\n"
         "1. category: Must be exactly 'Asset' or 'Competency'. If the document describes a reusable tool, package, framework, template, or toolkit, classify as 'Asset'. If it describes team skills, services, capability profiles, or competencies, classify as 'Competency'.\n"
-        "2. Extract specific metadata details from the document: Domain, Tech Stack, Industry, Solution Type, Architecture, Client Organization (optional), and Application Type (e.g., mobile app or web app).\n"
-        "3. tags: Consolidate all the valid values extracted in step 2 along with any other key technical skills, programming languages, or tools mentioned into a flat list of strings. Do not include null or empty values.\n"
+        "2. Extract specific metadata details from the document: Domain, Tech Stack, Industry, Solution Type, Architecture, Client Organization (optional), Application Type (e.g., mobile app or web app), and Dates (e.g., project dates, release dates, years).\n"
+        "3. tags: Consolidate all the valid values extracted in step 2 along with any other key technical skills, programming languages, tools, or dates mentioned into a flat list of strings. Do not include null or empty values.\n"
         "4. description: A 1-2 sentence summary of what the document or competency is about, highlighting any key deliverables or cost structure if mentioned.\n"
         "Respond ONLY as a JSON object with three keys: 'category', 'tags', and 'description'. Do not include any explanation or markdown wrappers."
     )

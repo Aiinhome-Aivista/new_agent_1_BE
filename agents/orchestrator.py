@@ -603,29 +603,68 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
                         extracted_texts.append(txt)
             full_document_text = "\n\n".join(extracted_texts).strip()
 
-        # Retrieve persistent case studies from DB
+        # Retrieve persistent case studies from DB if none were uploaded
         db_case_study_text = ""
         db_case_studies_list = []
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT name, description FROM knowledge_assets WHERE category = 'Case Study' ORDER BY created_at DESC")
-            db_rows = cursor.fetchall()
-            cursor.close()
-            conn.close()
-            
-            db_case_studies = []
-            for r in db_rows:
-                try:
-                    desc_obj = json.loads(r["description"])
-                    db_case_studies_list.append(desc_obj)
-                    db_case_studies.append(f"--- Previous Project Case Study: {r['name']} ---\n" + json.dumps(desc_obj, indent=2))
-                except:
-                    pass
-            db_case_study_text = "\n\n".join(db_case_studies)
-        except Exception as db_err:
-            print(f"Error fetching persistent case studies: {db_err}")
-            
+        if not structured_case_studies:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT name, description, capabilities FROM knowledge_assets WHERE category = 'Case Study'")
+                db_rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if db_rows:
+                    candidate_case_studies = []
+                    for r in db_rows:
+                        try:
+                            desc_obj = json.loads(r["description"])
+                            candidate_case_studies.append({
+                                "name": r["name"],
+                                "description": r["description"],
+                                "capabilities": r.get("capabilities", ""),
+                                "desc_obj": desc_obj
+                            })
+                        except:
+                            pass
+                            
+                    # Keyword matching boost
+                    req_query = " ".join(requirements)
+                    req_query_lower = req_query.lower()
+                    
+                    for c in candidate_case_studies:
+                        c["score_boost"] = 0.0
+                        caps = c.get("capabilities", "")
+                        if caps:
+                            cap_list = [cap.strip().lower() for cap in str(caps).split(",")]
+                            for cap in cap_list:
+                                if cap and cap in req_query_lower:
+                                    c["score_boost"] += 0.2
+                                    
+                    # Semantic search
+                    from database.vector_client import get_embedding, cosine_similarity
+                    query_emb = get_embedding(req_query)
+                    
+                    scored_cs = []
+                    for c in candidate_case_studies:
+                        c_emb = get_embedding(f"{c['name']} {c['description']}")
+                        sim = cosine_similarity(query_emb, c_emb)
+                        total_score = sim + c.get("score_boost", 0.0)
+                        scored_cs.append((total_score, c))
+                        
+                    scored_cs.sort(key=lambda x: x[0], reverse=True)
+                    top_cs = [item[1] for item in scored_cs[:2]]
+                    
+                    db_case_studies = []
+                    for c in top_cs:
+                        db_case_studies_list.append(c["desc_obj"])
+                        db_case_studies.append(f"--- Previous Project Case Study: {c['name']} ---\n" + json.dumps(c["desc_obj"], indent=2))
+                    
+                    db_case_study_text = "\n\n".join(db_case_studies)
+            except Exception as db_err:
+                print(f"Error fetching persistent case studies: {db_err}")
+                
         combined_case_study_text = ""
         if case_study_text:
             combined_case_study_text += case_study_text

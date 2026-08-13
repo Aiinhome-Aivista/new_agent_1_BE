@@ -233,6 +233,9 @@ def add_knowledge():
         if not files or all(f.filename == '' for f in files):
             return error_response("No selected files", status_code=400)
             
+        custom_tags_str = request.form.get("tags", "").strip()
+        custom_tags = [t.strip() for t in custom_tags_str.split(',')] if custom_tags_str else []
+            
         upload_dir = os.path.join(os.getcwd(), 'static', 'uploads', 'knowledge')
         os.makedirs(upload_dir, exist_ok=True)
         
@@ -278,8 +281,12 @@ def add_knowledge():
                 category = meta.get("category", "Asset")
                 
                 raw_tags = meta.get("tags", [])
+                
+                # Add the custom tags provided by the user
+                combined_tags = raw_tags + custom_tags
+                
                 # Filter out any empty strings or nulls and deduplicate
-                valid_tags = list(set([str(t).strip() for t in raw_tags if t and str(t).strip()]))
+                valid_tags = list(set([str(t).strip() for t in combined_tags if t and str(t).strip()]))
                 capabilities = ", ".join(valid_tags)
                 
                 description = meta.get("description", extracted_text[:200] + "...")
