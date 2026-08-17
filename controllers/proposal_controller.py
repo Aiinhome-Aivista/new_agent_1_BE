@@ -34,10 +34,11 @@ CRITICAL INSTRUCTIONS:
 3. Determine the most important missing details needed to scope the project effectively and create a comprehensive PPT presentation (e.g., specific goals, tech stack preferences, success metrics, constraints, target audience, key deliverables).
 4. Ask a highly targeted and precise question to obtain this specific missing information. Do NOT ask generic questions like "Could you provide more context?".
 5. Keep the question very concise (1 sentence max).
+6. If the provided Context and Q&A history already contain sufficient information (tech stack, scope, objectives, timeline, budget) to scope the project and create a PPT, or if there is no critical missing information, you MUST return the exact string "STOP" as the question.
 
 Return your response strictly as a JSON object:
 {{
-    "question": "The question text here"
+    "question": "The question text here or STOP"
 }}
 """
         
@@ -50,7 +51,7 @@ Current Context:
 Client Name: {context.get('clientName', 'N/A')}
 Project Duration: {context.get('projectDuration', 'N/A')}
 Budget: {context.get('budget', 'N/A')}
-Requirements Summary: {str(context.get('requirementsText', 'N/A'))[:500]}
+Requirements Summary: {str(context.get('requirementsText', 'N/A'))[:2000]}
 
 Previous Q&A History:
 {history_text if history_text else "None so far."}
@@ -64,7 +65,9 @@ Generate the next question to ask the user.
         res_json = safe_json_loads(res_str, {"question": "Based on your requirements, what is the primary business outcome you are expecting?"})
         
         # If the LLM returned a completely empty question, use a dynamic-sounding default
-        if not res_json.get("question") or len(res_json.get("question", "")) < 5:
+        # Unless it specifically returned "STOP"
+        question_text = res_json.get("question", "")
+        if question_text != "STOP" and (not question_text or len(question_text) < 5):
             res_json["question"] = "What are the most critical success factors for this project?"
         
         return jsonify({"success": True, "data": res_json})
