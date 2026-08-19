@@ -25,7 +25,7 @@ def get_llm(temperature=0.2, json_mode=False):
         model_kwargs["response_format"] = {"type": "json_object"}
 
     if MODE.lower() == "gemini":
-        print(f"✅ LangChain: Connecting to Gemini API (Model: {GEMINI_MODEL})")
+        print(f"[SUCCESS] LangChain: Connecting to Gemini API (Model: {GEMINI_MODEL})")
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY is not set in the .env file")
         # json_mode via model_kwargs might not be natively supported by ChatGoogleGenerativeAI in all versions,
@@ -37,7 +37,7 @@ def get_llm(temperature=0.2, json_mode=False):
             model_kwargs=model_kwargs
         )
     elif MODE.lower() == "cloud":
-        print(f"✅ LangChain: Connecting to Mistral Cloud API (Model: {MODEL_NAME})")
+        print(f"[SUCCESS] LangChain: Connecting to Mistral Cloud API (Model: {MODEL_NAME})")
         if not MISTRAL_API_KEY:
             raise ValueError("MISTRAL_API_KEY is not set in the .env file")
         return ChatOpenAI(
@@ -49,7 +49,7 @@ def get_llm(temperature=0.2, json_mode=False):
             timeout=300
         )
     else:
-        print(f"✅ LangChain: Connecting to Local Mistral (URL: {MISTRAL_LOCAL_URL}, Model: {MISTRAL_LOCAL_MODEL})")
+        print(f"[SUCCESS] LangChain: Connecting to Local Mistral (URL: {MISTRAL_LOCAL_URL}, Model: {MISTRAL_LOCAL_MODEL})")
         if not MISTRAL_LOCAL_URL or not MISTRAL_LOCAL_MODEL:
             raise ValueError("MISTRAL_LOCAL_URL or MISTRAL_LOCAL_MODEL is not set in the .env file")
         base_url = f"{MISTRAL_LOCAL_URL.rstrip('/')}/v1"
