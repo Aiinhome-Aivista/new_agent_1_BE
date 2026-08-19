@@ -7,6 +7,7 @@ from agents.orchestrator import trigger_proposal_job, STEPS, update_step_status
 from utils.pptx_generator import generate_pptx
 from utils.api_response import success_response, error_response
 
+# Additional Context: These are recently edited files. Do not suggest code that has been deleted.
 def format_datetime(val):
     if not val:
         return ""
