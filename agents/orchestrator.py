@@ -40,7 +40,7 @@ def classify_chunk(chunk_content):
     return "Other"
 
 
-# Define the step list in order
+# Define the step list in order so that the progress bar can be updated accordingly.
 STEPS = [
     "Ingesting",
     "Analyzing",
