@@ -120,6 +120,11 @@ def edit_proposal_ir(proposal_id):
     # partner is read-only — cannot save changes
     return proposal_controller.edit_proposal_ir(proposal_id)
 
+@app.route('/api/proposals/refine-slide', methods=['POST'], strict_slashes=False)
+@app.route('/api/proposals/refine-slide/', methods=['POST'], strict_slashes=False)
+def refine_proposal_slide():
+    return proposal_controller.refine_proposal_slide()
+
 @app.route('/api/proposals/download/<proposal_id>', methods=['GET'])
 def download_proposal_pptx(proposal_id):
     # All roles can download
@@ -137,6 +142,11 @@ def get_tech_options():
 @app.route('/api/proposals/calculate-budget', methods=['POST'])
 def calculate_budget():
     return proposal_controller.calculate_budget()
+
+@app.route('/api/generate-question', methods=['POST'])
+def handle_generate_question():
+    from controllers.proposal_controller import generate_question
+    return generate_question()
 
 @app.route('/api/proposals/resume/<proposal_id>', methods=['POST'])
 @require_role('presales', 'bidmanager', 'admin')
@@ -223,6 +233,9 @@ def add_knowledge():
         if not files or all(f.filename == '' for f in files):
             return error_response("No selected files", status_code=400)
             
+        custom_tags_str = request.form.get("tags", "").strip()
+        custom_tags = [t.strip() for t in custom_tags_str.split(',')] if custom_tags_str else []
+            
         upload_dir = os.path.join(os.getcwd(), 'static', 'uploads', 'knowledge')
         os.makedirs(upload_dir, exist_ok=True)
         
@@ -240,6 +253,8 @@ def add_knowledge():
 
         processed_count = 0
         
+
+        
         for file in files:
             if file and file.filename:
                 filename = secure_filename(file.filename)
@@ -249,11 +264,31 @@ def add_knowledge():
                 # Extract text
                 extracted_text = extract_text(filepath)
                 
+                # Document Validation
+                from utils.llm_client import validate_document
+                is_approved, res_json = validate_document(extracted_text)
+                if not is_approved:
+                    if os.path.exists(filepath):
+                        os.remove(filepath)
+                    cursor.close()
+                    conn.close()
+                    from flask import jsonify
+                    return jsonify(res_json), 400
+                
                 # Dynamic metadata extraction using LLM
                 from utils.llm_client import extract_pdf_metadata
                 meta = extract_pdf_metadata(extracted_text)
                 category = meta.get("category", "Asset")
-                capabilities = meta.get("capabilities", "File Upload")
+                
+                raw_tags = meta.get("tags", [])
+                
+                # Add the custom tags provided by the user
+                combined_tags = raw_tags + custom_tags
+                
+                # Filter out any empty strings or nulls and deduplicate
+                valid_tags = list(set([str(t).strip() for t in combined_tags if t and str(t).strip()]))
+                capabilities = ", ".join(valid_tags)
+                
                 description = meta.get("description", extracted_text[:200] + "...")
                 
                 # Insert into SQLite (Metadata)
@@ -265,7 +300,7 @@ def add_knowledge():
                 
                 # Store in VectorDB (ChromaDB)
                 # Note: pricing_kb.py uses default collection for search
-                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": category, "description": description})
+                store_embedding("knowledge_assets", str(asset_id), extracted_text, metadata={"name": filename, "category": category, "description": description, "capabilities": capabilities})
                 
                 # Store in GraphDB (ArangoDB)
                 if arango:
@@ -290,7 +325,8 @@ def add_knowledge():
         cursor.close()
         conn.close()
         
-        return success_response({"message": f"Successfully uploaded and indexed {processed_count} files"}, status_code=201)
+        from flask import jsonify
+        return jsonify(res_json), 201
     except Exception as e:
         import traceback
         traceback.print_exc()

@@ -166,7 +166,7 @@ DESIGN_AGENT_PROMPT_0 = ChatPromptTemplate.from_messages([
                 "2. Evaluate each candidate's development cost, delivery risk, scalability, and alignment with the timeline.\n"
                 "3. Choose the best, most compliant option, and render it into the final output format.\n\n"
                 "Your response must ONLY be a JSON object with these keys:\n"
-                "- 'business_summary': a highly detailed and convenient 3-paragraph string summarizing the proposed solution. It MUST explicitly state why this project is being implemented and clearly articulate the strategic business benefits and advantages (e.g., ROI, operational efficiency, competitive advantage) of implementing it.\n"
+                "- 'business_summary': a highly detailed and convenient 3-paragraph string summarizing the proposed solution. It MUST strictly focus on the business perspective. Explicitly state why this project is being implemented and clearly articulate the strategic business benefits and advantages (e.g., ROI, operational efficiency, competitive advantage). DO NOT include any technical overview, technology names (e.g., React, FastAPI, Database), or architecture details (e.g., RAG, Guardrails) in this summary.\n"
                 "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (a concise but informative paragraph of exactly 2 to 3 sentences and maximum 40 words explaining the pillar so the reader understands it well without overflowing the presentation slide).\n"
                 "- 'data_flow': a list of exactly 4 strings representing the high-level data flow steps.\n"
                 "- 'architecture': a list of exactly 3 layers (e.g. 'Presentation layer (UI Client)', "
@@ -184,10 +184,24 @@ DESIGN_AGENT_PROMPT_0 = ChatPromptTemplate.from_messages([
                 "  * 'tech_architecture_mermaid': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing the technical architecture of that case study.\n"
                 "  * 'tech_architecture_explanation': a list of exactly 3 strings representing extremely short and concise summaries (exactly 1 sentence, maximum 12 words per summary) of: 1. Source/Ingestion, 2. Storage/Processing, and 3. Consumption/Reporting. They must fit in a very small box.\n"
                 "  * 'key_technologies': a list of exactly 3-4 technologies used (e.g. ['Snowflake', 'Azure Data Factory']).\n"
-                "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n\n"
+                "  * 'benefits_outcome': a list of exactly 3-4 strings summarizing benefits and outcomes.\n"
+                "- 'complex_diagrams': a list of exactly 2 objects representing logical system architecture diagrams for the proposed client solution (NOT the proposal creator app itself). "
+                "The first object must be for the Logical Reference Architecture (title: 'Reference Architecture') representing the logical end-to-end data/component flow of the proposed solution. "
+                "The second object must be for the Cloud Native Deployment Landscape (title: 'Landscape Architecture') representing the topology of the proposed solution on the selected cloud platform (e.g. AWS, Azure, or GCP). "
+                "Each object must have these keys:\n"
+                "  * 'title': the title of the diagram.\n"
+                "  * 'mermaid_code': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing that specific architecture of the proposed solution. Follow these strict syntax rules:\n"
+                "    1. Start with 'graph LR'.\n"
+                "    2. Use clear, alphanumeric node IDs (e.g., UI, API, DB).\n"
+                "    3. Enclose all text labels in double quotes (e.g., UI[\"Web UI (React)\"] or DB[(\"PostgreSQL Database\")]) to avoid rendering errors. Do NOT use brackets or parentheses without double quotes around the label text inside the node.\n"
+                "    4. Use standard connectors like --> and subgraph boxes for different layers (e.g. Ingestion, Compute, Storage).\n"
+                "    5. Do NOT include style declarations, class definitions, or CSS inside the Mermaid code.\n"
+                "    6. THE DIAGRAMS MUST BE COMPLETELY DIFFERENT: The 'Reference Architecture' diagram must show generic, logical tiers and data ingestion/processing pipelines (e.g. 'API Gateway', 'Core API Server', 'Cache', 'Object Storage', 'Vector Database', 'Message Queue', 'Auth Service'). "
+                "The 'Landscape Architecture' diagram must map these logical components to actual cloud-native deployment resources of the target cloud provider (identify the provider from the RFP text, e.g. AWS, Azure, or GCP, defaulting to Azure if not specified). E.g. for Azure use 'Azure API Management', 'Azure App Service', 'Azure Cache for Redis', 'Azure Blob Storage', 'Azure Cognitive Search', 'Azure Monitor', organized in clean subgraphs representing VPC/VNet zones, API layer, database layer, and monitoring.\n"
+                "    7. BE DETAILED: Make the flowcharts comprehensive (at least 6-10 nodes each) reflecting the specific needs in the RFP document context (e.g., if database migration is requested, show source systems, transfer utility, target cloud database; if RAG is requested, show document ingestion, vector storage, LLM orchestration, client UI).\n\n"
                 "Do not include any explanation or markdown formatting outside the JSON."
             )),
-            ("user", "Requirements:\n{requirements}\n\nBudget: {budget}\nDuration: {duration}\n\nCase Study Documents Text:\n{case_study_text}")
+            ("user", "Requirements:\n{requirements}\n\nFull RFP Document Text Snippet:\n{full_rfp_text}\n\nBudget: {budget}\nDuration: {duration}\n\nCase Study Documents Text:\n{case_study_text}")
         ])
 # Extracted from orchestrator.py
 ORCHESTRATOR_SYS_PROMPT_0 = (
@@ -241,9 +255,10 @@ LLM_CLIENT_SYS_PROMPT_0 = (
         "You are an assistant that analyzes technical documents or competencies.\n"
         "Extract the following metadata from the text:\n"
         "1. category: Must be exactly 'Asset' or 'Competency'. If the document describes a reusable tool, package, framework, template, or toolkit, classify as 'Asset'. If it describes team skills, services, capability profiles, or competencies, classify as 'Competency'.\n"
-        "2. capabilities: A comma-separated list of technical skills, programming languages, technologies, frameworks, libraries, databases, or tools mentioned in the document (e.g., 'React, TypeScript, Zustand, Tailwind CSS, Vite' or 'Python, Flask, PySpark, Airflow'). Keep them concise and distinct.\n"
-        "3. description: A 1-2 sentence summary of what the document or competency is about, highlighting any key deliverables or cost structure if mentioned.\n"
-        "Respond ONLY as a JSON object with these three keys. Do not include any explanation or markdown wrappers."
+        "2. Extract specific metadata details from the document: Domain, Tech Stack, Industry, Solution Type, Architecture, Client Organization (optional), Application Type (e.g., mobile app or web app), and Dates (e.g., project dates, release dates, years).\n"
+        "3. tags: Consolidate all the valid values extracted in step 2 along with any other key technical skills, programming languages, tools, or dates mentioned into a flat list of strings. Do not include null or empty values.\n"
+        "4. description: A 1-2 sentence summary of what the document or competency is about, highlighting any key deliverables or cost structure if mentioned.\n"
+        "Respond ONLY as a JSON object with three keys: 'category', 'tags', and 'description'. Do not include any explanation or markdown wrappers."
     )
 
 # Extracted from pricing_kb.py

@@ -103,12 +103,16 @@ def init_sqlite_db():
         project_duration TEXT NOT NULL,
         budget TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'Ingesting',
+        submitted_by_role TEXT NULL,
+        last_transitioned_at TIMESTAMP NULL,
         generated_file_path TEXT NULL,
         structured_json_ir TEXT NULL,
         files_info TEXT NULL,
         requirements_text TEXT NULL,
         case_study_files TEXT NULL,
         draft_ir TEXT NULL,
+        additional_context TEXT NULL,
+        ppt_template_file TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -121,6 +125,14 @@ def init_sqlite_db():
     try: cursor.execute("ALTER TABLE proposals ADD COLUMN case_study_files TEXT NULL")
     except: pass
     try: cursor.execute("ALTER TABLE proposals ADD COLUMN draft_ir TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN additional_context TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN ppt_template_file TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN submitted_by_role TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN last_transitioned_at TIMESTAMP NULL")
     except: pass
     
     cursor.execute("""
@@ -186,6 +198,10 @@ def init_db():
         )
         cursor = conn.cursor()
         
+        db_name = os.getenv("MYSQL_NAME", "mydb")
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+        cursor.execute(f"USE {db_name}")
+        
         # Read and execute schema file
         schema_path = os.path.join(os.path.dirname(__file__), 'schema.sql')
         if os.path.exists(schema_path):
@@ -227,6 +243,14 @@ def init_db():
             try: cursor.execute("ALTER TABLE proposals ADD COLUMN draft_ir LONGTEXT NULL")
             except mysql.connector.Error as err:
                 if err.errno != 1060: print(f"Migration error (draft_ir): {err}")
+                    
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN additional_context LONGTEXT NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (additional_context): {err}")
+                    
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN ppt_template_file VARCHAR(500) NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (ppt_template_file): {err}")
                     
             conn.commit()
             print("MySQL database initialized successfully.")

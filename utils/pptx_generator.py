@@ -322,96 +322,138 @@ def add_reference_architecture_slide(slide, prs, data):
     create_slide_header(slide, "Reference Architecture", "Enterprise logical data patterns")
     add_footer(slide)
 
-    cloud_name = "Azure"
-    if data and ("aws" in str(data).lower() or "amazon" in str(data).lower()):
-        cloud_name = "AWS"
-    elif data and ("gcp" in str(data).lower() or "google" in str(data).lower()):
-        cloud_name = "Google Cloud"
+    mermaid_code = None
+    description = None
+    if data:
+        complex_diags = data.get("complex_diagrams", [])
+        for diag in complex_diags:
+            if diag.get("title", "").lower() == "reference architecture":
+                mermaid_code = diag.get("mermaid_code")
+                description = diag.get("description")
+                break
 
-    storage_name = "Azure Blob Storage"
-    if cloud_name == "AWS":
-        storage_name = "AWS S3"
-    elif cloud_name == "Google Cloud":
-        storage_name = "Google Cloud Storage"
+    is_dynamic = False
+    if mermaid_code:
+        is_dynamic = True
+    else:
+        cloud_name = "Azure"
+        if data and ("aws" in str(data).lower() or "amazon" in str(data).lower()):
+            cloud_name = "AWS"
+        elif data and ("gcp" in str(data).lower() or "google" in str(data).lower()):
+            cloud_name = "Google Cloud"
 
-    mermaid_code = (
-        "graph LR\n"
-        "    subgraph External [External Sources]\n"
-        "        E1[RFI/RFP Documents]\n"
-        "        E2[Project Timeline]\n"
-        "        E3[Competency Documents]\n"
-        "        E4[Company Asset Lists]\n"
-        "        E5[Questionnaires]\n"
-        "        E6[Financial Documents]\n"
-        "        PA[Parsing Agent]\n"
-        "    end\n"
-        "    \n"
-        "    subgraph Orchestration [Orchestration Layer]\n"
-        "        HO[Hierarchical Orchestrator]\n"
-        "        RMA[Requirement Mapping Agent]\n"
-        "        SDA[Solution Design Agent]\n"
-        "        PLA[Planning Agent]\n"
-        "        RA[Rendering Agent]\n"
-        "    end\n"
-        "    \n"
-        "    subgraph Knowledge [Knowledge Layer]\n"
-        "        KB[PostgreSQL: Competencies]\n"
-        "        VS[ChromaDB: Vector Store]\n"
-        "    end\n"
-        "    \n"
-        "    subgraph Guardrails [Guardrails]\n"
-        "        VAL[Guardrails SDK: Validation]\n"
-        "        CC[Compliance Check]\n"
-        "    end\n"
-        "    \n"
-        "    subgraph Output [Output Layer]\n"
-        "        PRE[PowerPoint Rendering Engine]\n"
-        f"        ABS[{storage_name}: Draft Proposals]\n"
-        "        HRI[Human Review Interface]\n"
-        "        AP[Approved Proposal]\n"
-        "    end\n"
-        "    \n"
-        "    E1 --> PA\n"
-        "    E2 --> PA\n"
-        "    E3 --> PA\n"
-        "    E4 --> PA\n"
-        "    E5 --> PA\n"
-        "    E6 --> PA\n"
-        "    PA --> HO\n"
-        "    \n"
-        "    HO --> RMA\n"
-        "    HO --> SDA\n"
-        "    HO --> PLA\n"
-        "    HO --> RA\n"
-        "    \n"
-        "    RMA --> KB\n"
-        "    SDA --> KB\n"
-        "    SDA --> VS\n"
-        "    PLA --> KB\n"
-        "    PLA --> VS\n"
-        "    RA --> VS\n"
-        "    \n"
-        "    KB --> VAL\n"
-        "    VS --> VAL\n"
-        "    VAL --> CC\n"
-        "    \n"
-        "    HO --> CC\n"
-        "    HO --> PRE\n"
-        "    PRE --> ABS\n"
-        "    ABS --> HRI\n"
-        "    HRI --> AP\n"
-        "    CC --> HRI\n"
-    )
+        storage_name = "Azure Blob Storage"
+        if cloud_name == "AWS":
+            storage_name = "AWS S3"
+        elif cloud_name == "Google Cloud":
+            storage_name = "Google Cloud Storage"
 
-    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(9), Inches(0.4))
+        mermaid_code = (
+            "graph LR\n"
+            "    subgraph External [External Sources]\n"
+            "        E1[RFI/RFP Documents]\n"
+            "        E2[Project Timeline]\n"
+            "        E3[Competency Documents]\n"
+            "        E4[Company Asset Lists]\n"
+            "        E5[Questionnaires]\n"
+            "        E6[Financial Documents]\n"
+            "        PA[Parsing Agent]\n"
+            "    end\n"
+            "    \n"
+            "    subgraph Orchestration [Orchestration Layer]\n"
+            "        HO[Hierarchical Orchestrator]\n"
+            "        RMA[Requirement Mapping Agent]\n"
+            "        SDA[Solution Design Agent]\n"
+            "        PLA[Planning Agent]\n"
+            "        RA[Rendering Agent]\n"
+            "    end\n"
+            "    \n"
+            "    subgraph Knowledge [Knowledge Layer]\n"
+            "        KB[PostgreSQL: Competencies]\n"
+            "        VS[ChromaDB: Vector Store]\n"
+            "    end\n"
+            "    \n"
+            "    subgraph Guardrails [Guardrails]\n"
+            "        VAL[Guardrails SDK: Validation]\n"
+            "        CC[Compliance Check]\n"
+            "    end\n"
+            "    \n"
+            "    subgraph Output [Output Layer]\n"
+            "        PRE[PowerPoint Rendering Engine]\n"
+            f"        ABS[{storage_name}: Draft Proposals]\n"
+            "        HRI[Human Review Interface]\n"
+            "        AP[Approved Proposal]\n"
+            "    end\n"
+            "    \n"
+            "    E1 --> PA\n"
+            "    E2 --> PA\n"
+            "    E3 --> PA\n"
+            "    E4 --> PA\n"
+            "    E5 --> PA\n"
+            "    E6 --> PA\n"
+            "    PA --> HO\n"
+            "    \n"
+            "    HO --> RMA\n"
+            "    HO --> SDA\n"
+            "    HO --> PLA\n"
+            "    HO --> RA\n"
+            "    \n"
+            "    RMA --> KB\n"
+            "    SDA --> KB\n"
+            "    SDA --> VS\n"
+            "    PLA --> KB\n"
+            "    PLA --> VS\n"
+            "    RA --> VS\n"
+            "    \n"
+            "    KB --> VAL\n"
+            "    VS --> VAL\n"
+            "    VAL --> CC\n"
+            "    \n"
+            "    HO --> CC\n"
+            "    HO --> PRE\n"
+            "    PRE --> ABS\n"
+            "    ABS --> HRI\n"
+            "    HRI --> AP\n"
+            "    CC --> HRI\n"
+        )
+
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(9), Inches(0.4))
     p = txBox.text_frame.paragraphs[0]
-    p.text = "System Data Flow & Orchestration Architecture"
-    set_font(p.runs[0], size=16, bold=True, color=CHARCOAL)
+    p.text = "Logical Reference Architecture & Component Topology" if is_dynamic else "System Data Flow & Orchestration Architecture"
+    set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
+
+    # Calculate Y-coordinate limits based on whether description is present
+    img_top = Inches(1.5)
+    img_height = Inches(5.5)
+
+    if description:
+        # Render description text box
+        desc_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.4), Inches(9.0), Inches(0.8))
+        tf = desc_box.text_frame
+        tf.word_wrap = True
+        tf.margin_top = Inches(0)
+        tf.margin_bottom = Inches(0)
+        tf.margin_left = Inches(0)
+        tf.margin_right = Inches(0)
+        
+        # Split description by newline and add paragraph for each bullet point
+        desc_paragraphs = [line.strip() for line in description.split("\n") if line.strip()]
+        for idx, text in enumerate(desc_paragraphs):
+            if idx == 0:
+                p_desc = tf.paragraphs[0]
+            else:
+                p_desc = tf.add_paragraph()
+            p_desc.text = text
+            set_font(p_desc.runs[0], size=10, color=CHARCOAL)
+            p_desc.space_after = Pt(2)
+            
+        img_top = Inches(2.3)
+        img_height = Inches(4.7)
 
     temp_img_path = render_mermaid_to_image(mermaid_code)
     if temp_img_path and os.path.exists(temp_img_path):
         try:
-            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.5), Inches(9.6), Inches(5.5))
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), img_top, Inches(9.6), img_height)
         except Exception as e:
             print(f"Failed to add mermaid image to Reference Architecture slide: {e}")
         finally:
@@ -437,72 +479,115 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
     create_slide_header(slide, f"Landscape Architecture ({cloud_name} Cloud Platform)", f"{cloud_name} Native Services & Integration Topology")
     add_footer(slide)
         
-    db_name = data.get("db_tech", "PostgreSQL") if data else "PostgreSQL"
-    backend_name = data.get("backend_tech", "FastAPI") if data else "FastAPI"
-    
-    # Check cloud tools
-    ingestion_tool = "Azure Data Factory"
-    monitor_tool = "Azure Monitor"
-    storage_tool = "Azure Blob Storage"
-    search_tool = "Azure Cognitive Search"
-    k8s_cluster = "AKS Cluster"
-    
-    if cloud_name == "AWS":
-        ingestion_tool = "AWS Glue"
-        monitor_tool = "AWS CloudWatch"
-        storage_tool = "AWS S3"
-        search_tool = "Amazon Kendra"
-        k8s_cluster = "EKS Cluster"
-    elif cloud_name == "Google Cloud":
-        ingestion_tool = "Google Cloud Dataflow"
-        monitor_tool = "Google Cloud Monitoring"
-        storage_tool = "Google Cloud Storage"
-        search_tool = "Google Cloud Vertex AI Search"
-        k8s_cluster = "GKE Cluster"
+    mermaid_code = None
+    description = None
+    if data:
+        complex_diags = data.get("complex_diagrams", [])
+        for diag in complex_diags:
+            title_l = diag.get("title", "").lower()
+            if "landscape" in title_l or "cloud" in title_l:
+                mermaid_code = diag.get("mermaid_code")
+                description = diag.get("description")
+                break
 
-    mermaid_code = (
-        "graph LR\n"
-        "    subgraph OnPrem [On-Premises]\n"
-        f"        Client[Client Artefacts] --> ADF[{ingestion_tool}: Ingestion]\n"
-        "    end\n"
-        "    \n"
-        "    subgraph Monitoring [Monitoring]\n"
-        f"        Monitor[{monitor_tool}: Logs & Metrics] --> Alerts[Alerts & Governance]\n"
-        "    end\n"
-        "    \n"
-        "    subgraph DataFlow [Data Flow]\n"
-        "        SJSON[Structured JSON Intermediate] --> DPS[Deterministic Proposal Structure] --> PPDraft[PowerPoint Draft] --> HR[Human Review] --> AP[Approved Proposal]\n"
-        "    end\n"
-        "    \n"
-        f"    subgraph Cloud [{cloud_name} Cloud Platform]\n"
-        f"        AKS[{k8s_cluster}: Multi-Agent System]\n"
-        f"        FastAPI[{backend_name}: Agent Services] --> Gateway[API Gateway: {backend_name}] --> ExtAPI[External APIs: PowerPoint Rendering]\n"
-        f"        DB[{db_name}: Knowledge Base] --> Embed[pgvector: Embeddings] --> Dashboard[Human Review Dashboard]\n"
-        "        VS[ChromaDB: Vector Store] --> Embed\n"
-        f"        Blob[{storage_tool}: Artefacts]\n"
-        f"        Search[{search_tool}: Indexing] --> RAG[RAG: Requirement Mapping] --> Design[Solution Design]\n"
-        "    end\n"
-        "    \n"
-        "    ADF --> AKS\n"
-        "    ADF --> SJSON\n"
-        "    AKS --> Monitor\n"
-        "    AKS --> DPS\n"
-        "    AKS --> FastAPI\n"
-        "    AKS --> DB\n"
-        "    AKS --> VS\n"
-        "    AKS --> Blob\n"
-        "    AKS --> Search\n"
-    )
+    is_dynamic = False
+    if mermaid_code:
+        is_dynamic = True
+    else:
+        db_name = data.get("db_tech", "PostgreSQL") if data else "PostgreSQL"
+        backend_name = data.get("backend_tech", "FastAPI") if data else "FastAPI"
+        
+        # Check cloud tools
+        ingestion_tool = "Azure Data Factory"
+        monitor_tool = "Azure Monitor"
+        storage_tool = "Azure Blob Storage"
+        search_tool = "Azure Cognitive Search"
+        k8s_cluster = "AKS Cluster"
+        
+        if cloud_name == "AWS":
+            ingestion_tool = "AWS Glue"
+            monitor_tool = "AWS CloudWatch"
+            storage_tool = "AWS S3"
+            search_tool = "Amazon Kendra"
+            k8s_cluster = "EKS Cluster"
+        elif cloud_name == "Google Cloud":
+            ingestion_tool = "Google Cloud Dataflow"
+            monitor_tool = "Google Cloud Monitoring"
+            storage_tool = "Google Cloud Storage"
+            search_tool = "Google Cloud Vertex AI Search"
+            k8s_cluster = "GKE Cluster"
 
-    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.1), Inches(9), Inches(0.4))
+        mermaid_code = (
+            "graph LR\n"
+            "    subgraph OnPrem [On-Premises]\n"
+            f"        Client[Client Artefacts] --> ADF[{ingestion_tool}: Ingestion]\n"
+            "    end\n"
+            "    \n"
+            "    subgraph Monitoring [Monitoring]\n"
+            f"        Monitor[{monitor_tool}: Logs & Metrics] --> Alerts[Alerts & Governance]\n"
+            "    end\n"
+            "    \n"
+            "    subgraph DataFlow [Data Flow]\n"
+            "        SJSON[Structured JSON Intermediate] --> DPS[Deterministic Proposal Structure] --> PPDraft[PowerPoint Draft] --> HR[Human Review] --> AP[Approved Proposal]\n"
+            "    end\n"
+            "    \n"
+            f"    subgraph Cloud [{cloud_name} Cloud Platform]\n"
+            f"        AKS[{k8s_cluster}: Multi-Agent System]\n"
+            f"        FastAPI[{backend_name}: Agent Services] --> Gateway[API Gateway: {backend_name}] --> ExtAPI[External APIs: PowerPoint Rendering]\n"
+            f"        DB[{db_name}: Knowledge Base] --> Embed[pgvector: Embeddings] --> Dashboard[Human Review Dashboard]\n"
+            "        VS[ChromaDB: Vector Store] --> Embed\n"
+            f"        Blob[{storage_tool}: Artefacts]\n"
+            f"        Search[{search_tool}: Indexing] --> RAG[RAG: Requirement Mapping] --> Design[Solution Design]\n"
+            "    end\n"
+            "    \n"
+            "    ADF --> AKS\n"
+            "    ADF --> SJSON\n"
+            "    AKS --> Monitor\n"
+            "    AKS --> DPS\n"
+            "    AKS --> FastAPI\n"
+            "    AKS --> DB\n"
+            "    AKS --> VS\n"
+            "    AKS --> Blob\n"
+            "    AKS --> Search\n"
+        )
+
+    txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(9), Inches(0.4))
     p = txBox.text_frame.paragraphs[0]
     p.text = f"{cloud_name} Cloud Native Deployment Topology"
-    set_font(p.runs[0], size=16, bold=True, color=CHARCOAL)
+    set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
+
+    # Calculate Y-coordinate limits based on whether description is present
+    img_top = Inches(1.5)
+    img_height = Inches(5.5)
+
+    if description:
+        # Render description text box
+        desc_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.4), Inches(9.0), Inches(0.8))
+        tf = desc_box.text_frame
+        tf.word_wrap = True
+        tf.margin_top = Inches(0)
+        tf.margin_bottom = Inches(0)
+        tf.margin_left = Inches(0)
+        tf.margin_right = Inches(0)
+        
+        # Split description by newline and add paragraph for each bullet point
+        desc_paragraphs = [line.strip() for line in description.split("\n") if line.strip()]
+        for idx, text in enumerate(desc_paragraphs):
+            if idx == 0:
+                p_desc = tf.paragraphs[0]
+            else:
+                p_desc = tf.add_paragraph()
+            p_desc.text = text
+            set_font(p_desc.runs[0], size=10, color=CHARCOAL)
+            p_desc.space_after = Pt(2)
+            
+        img_top = Inches(2.3)
+        img_height = Inches(4.7)
 
     temp_img_path = render_mermaid_to_image(mermaid_code)
     if temp_img_path and os.path.exists(temp_img_path):
         try:
-            add_picture_proportionally(slide, temp_img_path, Inches(0.2), Inches(1.5), Inches(9.6), Inches(5.5))
+            add_picture_proportionally(slide, temp_img_path, Inches(0.2), img_top, Inches(9.6), img_height)
         except Exception as e:
             print(f"Failed to add mermaid image to Landscape slide: {e}")
         finally:

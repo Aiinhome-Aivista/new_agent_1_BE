@@ -13,7 +13,7 @@ class DesignAgent:
         self.llm = get_llm(temperature=0.3)
         self.llm_json = get_llm(temperature=0.2, json_mode=True)
 
-    def generate_design(self, ui_tech: str, backend_tech: str, db_tech: str, requirements: list, budget: str, duration: str, selected_rag: str = "", selected_guardrail: str = "", selected_action_engine: str = "", case_study_text: str = "") -> dict:
+    def generate_design(self, ui_tech: str, backend_tech: str, db_tech: str, requirements: list, budget: str, duration: str, selected_rag: str = "", selected_guardrail: str = "", selected_action_engine: str = "", case_study_text: str = "", full_rfp_text: str = "") -> dict:
         """
         Runs ToT architecture generation.
         1. Explores candidate topologies.
@@ -198,7 +198,8 @@ class DesignAgent:
                 "requirements": json.dumps(requirements),
                 "budget": budget,
                 "duration": duration,
-                "case_study_text": case_study_text or "No case study documents provided."
+                "case_study_text": case_study_text or "No case study documents provided.",
+                "full_rfp_text": full_rfp_text or "No full RFP document text snippet provided."
             })
             content = res.content.strip()
             if content.startswith("```json"):
@@ -211,6 +212,7 @@ class DesignAgent:
             # Basic validation
             pillars = design_data.get("solution_pillars", default_pillars)
             arch = design_data.get("architecture", default_architecture)
+            diags = design_data.get("complex_diagrams", default_complex_diagrams)
             
             return {
                 "business_summary": design_data.get("business_summary", default_business_summary),
@@ -218,7 +220,8 @@ class DesignAgent:
                 "data_flow": design_data.get("data_flow", default_data_flow),
                 "architecture": arch,
                 "infrastructure_approximation": design_data.get("infrastructure_approximation", default_infrastructure),
-                "similar_projects": design_data.get("similar_projects", default_similar_projects)
+                "similar_projects": design_data.get("similar_projects", default_similar_projects),
+                "complex_diagrams": diags
             }
         except Exception as e:
             print(f"Error in Solution Design Agent: {e}")
@@ -228,5 +231,6 @@ class DesignAgent:
                 "data_flow": default_data_flow,
                 "architecture": default_architecture,
                 "infrastructure_approximation": default_infrastructure,
-                "similar_projects": default_similar_projects
+                "similar_projects": default_similar_projects,
+                "complex_diagrams": default_complex_diagrams
             }

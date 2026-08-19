@@ -1,7 +1,7 @@
 import os
 import uuid
 import json
-from flask import request, send_file
+from flask import request, send_file, jsonify
 from database.db_connection import get_db_connection
 from agents.orchestrator import trigger_proposal_job, STEPS, update_step_status
 from utils.pptx_generator import generate_pptx
@@ -17,12 +17,71 @@ def format_datetime(val):
     except Exception:
         return str(val)
 
+def generate_question():
+    try:
+        data = request.get_json()
+        context = data.get('context', {})
+        history = data.get('history', [])
+        question_index = data.get('questionIndex', 1)
+        
+        system_prompt = f"""You are an intelligent proposal scoping assistant.
+Your task is to ask the user a relevant, single follow-up question to gather more context about their project proposal.
+The user is at question {question_index} out of 10.
+
+CRITICAL INSTRUCTIONS:
+1. You MUST ask a completely DIFFERENT question from the ones in the Q&A history.
+2. Analyze the provided Context and Q&A history to deeply understand what critical information is still missing.
+3. Determine the most important missing details needed to scope the project effectively and create a comprehensive PPT presentation (e.g., specific goals, tech stack preferences, success metrics, constraints, target audience, key deliverables).
+4. Ask a highly targeted and precise question to obtain this specific missing information. Do NOT ask generic questions like "Could you provide more context?".
+5. Keep the question very concise (1 sentence max).
+6. If the provided Context and Q&A history already contain sufficient information (tech stack, scope, objectives, timeline, budget) to scope the project and create a PPT, or if there is no critical missing information, you MUST return the exact string "STOP" as the question.
+
+Return your response strictly as a JSON object:
+{{
+    "question": "The question text here or STOP"
+}}
+"""
+        
+        history_text = ""
+        for idx, qa in enumerate(history):
+            history_text += f"Q{idx+1}: {qa.get('question')}\nA: {qa.get('answer')}\n\n"
+            
+        user_prompt = f"""
+Current Context:
+Client Name: {context.get('clientName', 'N/A')}
+Project Duration: {context.get('projectDuration', 'N/A')}
+Budget: {context.get('budget', 'N/A')}
+Requirements Summary: {str(context.get('requirementsText', 'N/A'))[:2000]}
+
+Previous Q&A History:
+{history_text if history_text else "None so far."}
+
+Generate the next question to ask the user.
+"""
+        
+        from utils.llm_client import query_llm, safe_json_loads
+        res_str = query_llm(system_prompt, user_prompt, temperature=0.6, max_tokens=150)
+        
+        res_json = safe_json_loads(res_str, {"question": "Based on your requirements, what is the primary business outcome you are expecting?"})
+        
+        # If the LLM returned a completely empty question, use a dynamic-sounding default
+        # Unless it specifically returned "STOP"
+        question_text = res_json.get("question", "")
+        if question_text != "STOP" and (not question_text or len(question_text) < 5):
+            res_json["question"] = "What are the most critical success factors for this project?"
+        
+        return jsonify({"success": True, "data": res_json})
+    except Exception as e:
+        print(f"Error generating question: {e}")
+        return jsonify({"success": False, "data": {"question": "Could you elaborate on the technical constraints for this project?"}}), 500
+
 def upload_proposal():
     try:
         client_name = request.form.get("client_name")
         project_duration = request.form.get("project_duration")
         budget = request.form.get("budget")
         requirements_text = request.form.get("requirements_text")
+        additional_context = request.form.get("additional_context")
         
         if not client_name or client_name.strip() == "":
             client_name = "Extracting Client Name..."
@@ -44,6 +103,25 @@ def upload_proposal():
                 safe_name = f"{uuid.uuid4()}_{file.filename}"
                 save_path = os.path.join(upload_dir, safe_name)
                 file.save(save_path)
+                
+                # Extract text for validation
+                from utils.doc_extractor import extract_text
+                extracted_text = extract_text(save_path)
+                
+                # Document Validation
+                from utils.llm_client import validate_document
+                is_approved, res_json = validate_document(extracted_text)
+                if not is_approved:
+                    # Remove current file
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                    # Clean up other files uploaded in this request
+                    for uf in uploaded_files:
+                        if os.path.exists(uf["saved_path"]):
+                            os.remove(uf["saved_path"])
+                    from flask import jsonify
+                    return jsonify(res_json), 400
+                
                 uploaded_files.append({
                     "original_name": file.filename,
                     "saved_path": save_path
@@ -57,6 +135,28 @@ def upload_proposal():
                 safe_name = f"{uuid.uuid4()}_{file.filename}"
                 save_path = os.path.join(upload_dir, safe_name)
                 file.save(save_path)
+                
+                # Extract text for validation
+                from utils.doc_extractor import extract_text
+                extracted_text = extract_text(save_path)
+                
+                # Document Validation
+                from utils.llm_client import validate_document
+                is_approved, res_json = validate_document(extracted_text)
+                if not is_approved:
+                    # Remove current file
+                    if os.path.exists(save_path):
+                        os.remove(save_path)
+                    # Clean up other files uploaded in this request
+                    for uf in uploaded_files:
+                        if os.path.exists(uf["saved_path"]):
+                            os.remove(uf["saved_path"])
+                    for uf in uploaded_case_study_files:
+                        if os.path.exists(uf["saved_path"]):
+                            os.remove(uf["saved_path"])
+                    from flask import jsonify
+                    return jsonify(res_json), 400
+                
                 uploaded_case_study_files.append({
                     "original_name": file.filename,
                     "saved_path": save_path
@@ -81,10 +181,10 @@ def upload_proposal():
         cursor.execute("SELECT COUNT(*) FROM proposals WHERE status IN ('Ingesting', 'Analyzing', 'Designing', 'Planning', 'Assembling', 'WaitingForRateConfirmation')")
         active_count = cursor.fetchone()[0]
         status = "Queued" if active_count > 0 else "Ingesting"
-
+ 
         cursor.execute(
-            "INSERT INTO proposals (id, client_name, project_duration, budget, status, files_info, requirements_text, case_study_files, ppt_template_file) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (proposal_id, client_name, project_duration, budget, status, json.dumps(uploaded_files), requirements_text, json.dumps(uploaded_case_study_files), ppt_template_path)
+            "INSERT INTO proposals (id, client_name, project_duration, budget, status, files_info, requirements_text, case_study_files, ppt_template_file, additional_context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (proposal_id, client_name, project_duration, budget, status, json.dumps(uploaded_files), requirements_text, json.dumps(uploaded_case_study_files), ppt_template_path, additional_context)
         )
         conn.commit()
         cursor.close()
@@ -437,7 +537,7 @@ def transition_proposal_status(proposal_id):
             
         # Perform status update, record who made the transition and when
         cursor.execute(
-            "UPDATE proposals SET status = %s, submitted_by_role = %s, last_transitioned_at = NOW() WHERE id = %s",
+            "UPDATE proposals SET status = %s, submitted_by_role = %s, last_transitioned_at = CURRENT_TIMESTAMP WHERE id = %s",
             (new_status, user_role, proposal_id)
         )
         
@@ -693,3 +793,326 @@ def resume_proposal_rate(proposal_id):
         return success_response({"message": f"Resumed orchestration phase 3 for {proposal_id}"})
     except Exception as e:
         return error_response(str(e), status_code=500)
+
+def refine_proposal_slide():
+    """AI Chatbot endpoint to refine a specific PPT slide or field based on natural language instructions."""
+    try:
+        from flask import request
+        import copy
+        import json
+        import re
+
+        data = request.get_json() or {}
+        proposal_id = data.get("proposal_id", "")
+        slide_number = data.get("slide_number", 1)
+        slide_title = data.get("slide_title", "")
+        instruction = data.get("instruction", "")
+        structured_ir = data.get("structured_ir", {})
+        current_content = data.get("current_content", None)
+
+        if not instruction:
+            return error_response("Instruction is required", status_code=400)
+
+        sys_prompt = (
+            "You are an expert AI PPT Executive Editor & Context-Aware Strong Design Agent.\n"
+            "Your task is to dynamically analyze the current slide content and modify, explain, enhance, format, or replace the content of the PPT slide based on user natural language instructions.\n\n"
+            "Real-Time Validation & Correction Rules:\n"
+            "1. Read the user's natural language instruction carefully. If it is gibberish, meaningless (e.g., 'asdfasdf', 'ghjkhjk', '12345'), contains random characters, or is completely unclear/unrelated to editing the slides, you MUST NOT modify the IR (set 'updated_ir' to the exact input structured_ir) and set 'reply' to a polite message in English asking the user to write their request clearly/properly (e.g., ' Please write your instructions clearly so that I can update the slide properly.').\n"
+            "2. If the user's instruction is valid but you're not sure which slide to apply it to, apply it contextually to the target slide number/title provided.\n"
+            "3. If user asks to 'explain', 'elaborate', or 'detail', expand each existing bullet point with detailed technical execution, business impact, and sub-points.\n"
+            "4. If user asks to make content 'business-oriented' or 'professional', transform each existing point on the slide into high-impact corporate executive statements with ROI and compliance metrics.\n"
+            "5. If user asks to 'replace' or provides revised text, strip out prompt command prefixes (e.g. 'Please replace existing content...') and set the slide's field cleanly to the revised bullet points.\n"
+            "6. If you are modifying a diagram, edit the Mermaid syntax string inside the corresponding item in the 'complex_diagrams' list. Keep the Mermaid graph syntax valid and clean.\n"
+            "7. Respond strictly in JSON format with keys:\n"
+            "   - 'reply': A short, clear confirmation message explaining what was modified (or validation warning if input was unclear/gibberish).\n"
+            "   - 'updated_ir': A dictionary containing the modified keys from the structured JSON IR. You can return ONLY the modified keys (and their updated values) or the full updated IR. Any unmodified keys will be automatically preserved on the server.\n"
+        )
+
+        user_prompt = f"""
+Current Proposal Title: {structured_ir.get('proposal_title', '')}
+Target Client Name: {structured_ir.get('client_name', 'Client')}
+Target Slide Number: Slide {slide_number}
+Target Slide Title: "{slide_title}"
+Current Content On Target Slide (this is the existing data to be modified):
+{json.dumps(current_content, indent=2) if current_content else "N/A"}
+
+Available Keys in the Structured IR: {list(structured_ir.keys())}
+
+User Natural Language Instruction: "{instruction}"
+
+Apply the requested modification contextually to Slide {slide_number} ("{slide_title}") or relevant fields in the structured IR.
+IMPORTANT: You MUST map the modified content to the matching key from the 'Available Keys' list above. For example:
+- Use 'business_summary' for Slide 2 (Business Summary).
+- Use 'requirements' for Slide 3 (Client Requirements).
+- Use 'gaps' for Slide 4 (Capability Gaps).
+- Use 'complex_diagrams' for Slide 12 (Reference Architecture Diagram) or Slide 13 (Landscape Architecture Diagram). For these diagrams, update the Mermaid syntax string inside the corresponding diagram item (matching by title).
+If the user asks to display a summary in points/bullets, return the summary text as bullet points starting with '•' (e.g. "• Point 1\n• Point 2").
+Do NOT invent new keys like 'executive_summary' or 'summary_points'.
+Ensure the returned JSON is valid and complete.
+"""
+
+        # Try LLM first if available
+        try:
+            from utils.llm_client import query_llm, safe_json_loads
+            res_str = query_llm(sys_prompt, user_prompt, temperature=0.2, json_mode=True)
+            res_json = safe_json_loads(res_str, None)
+            import os
+            debug_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "debug_refine.json")
+            with open(debug_path, "w", encoding="utf-8") as debug_file:
+                json.dump({
+                    "res_str": res_str,
+                    "res_json": res_json,
+                    "slide_title": slide_title,
+                    "slide_number": slide_number,
+                    "instruction": instruction
+                }, debug_file, indent=2)
+            if res_json and "updated_ir" in res_json and isinstance(res_json["updated_ir"], dict):
+                res_ir = res_json["updated_ir"]
+                
+                # Normalize LLM output: if the LLM returned mermaid_code directly under updated_ir
+                # also include keys that look like slide titles/headers
+                mermaid_keys = ["mermaid_code", "mermaidCode", "mermaid_diagram", "mermaid"]
+                for k, v in list(res_ir.items()):
+                    k_lower = k.lower()
+                    if isinstance(v, str) and ("architecture" in k_lower or "diagram" in k_lower or "reference" in k_lower or "landscape" in k_lower or "topology" in k_lower):
+                        if k not in mermaid_keys:
+                            mermaid_keys.append(k)
+                
+                found_mermaid = None
+                for m_key in mermaid_keys:
+                    if m_key in res_ir and isinstance(res_ir[m_key], str):
+                        found_mermaid = res_ir[m_key]
+                        break
+                
+                if found_mermaid:
+                    target_title = "Reference Architecture"
+                    if slide_number == 13 or "landscape" in slide_title.lower() or "cloud" in slide_title.lower():
+                        target_title = "Landscape Architecture"
+                    
+                    res_ir["complex_diagrams"] = [
+                        {
+                            "title": target_title,
+                            "mermaid_code": found_mermaid
+                        }
+                    ]
+                    for m_key in mermaid_keys:
+                        res_ir.pop(m_key, None)
+                
+                if "complex_diagrams" in res_ir and isinstance(res_ir["complex_diagrams"], dict):
+                    res_ir["complex_diagrams"] = [res_ir["complex_diagrams"]]
+
+                # Merge the LLM's updated keys with the original structured_ir to preserve all unmodified slides
+                merged_ir = copy.deepcopy(structured_ir)
+                
+                # Target diagram title for active slide
+                expected_title = "Reference Architecture"
+                if slide_number == 13 or "landscape" in slide_title.lower() or "cloud" in slide_title.lower():
+                    expected_title = "Landscape Architecture"
+
+                for key, val in res_ir.items():
+                    # Smart merge for complex_diagrams list of dicts to avoid deleting unmodified diagrams
+                    if key == "complex_diagrams" and isinstance(val, list) and isinstance(merged_ir.get("complex_diagrams"), list):
+                        existing_diagrams = {d.get("title", "").lower(): d for d in merged_ir["complex_diagrams"]}
+                        for new_d in val:
+                            # Normalize internal keys of the diagram dictionary
+                            # If the LLM returned 'diagram', 'mermaid', 'code', etc. inside the dictionary, map it to 'mermaid_code'
+                            diag_keys = ["mermaid_code", "mermaidCode", "mermaid_diagram", "mermaid", "diagram", "code", "mermaid_syntax"]
+                            for dk in diag_keys:
+                                if dk in new_d and dk != "mermaid_code":
+                                    new_d["mermaid_code"] = new_d[dk]
+                                    new_d.pop(dk, None)
+                                    
+                            # Force the title to match the active slide's target title to avoid LLM hallucinated title mismatch
+                            new_d["title"] = expected_title
+                            t_lower = expected_title.lower()
+                            if t_lower in existing_diagrams:
+                                existing_diagrams[t_lower].update(new_d)
+                            else:
+                                merged_ir["complex_diagrams"].append(new_d)
+                    else:
+                        merged_ir[key] = val
+
+                return success_response({
+                    "reply": res_json.get("reply", f"Successfully updated Slide {slide_number} based on your instruction!"),
+                    "updated_ir": merged_ir
+                })
+        except Exception as llm_err:
+            print("LLM refinement error (falling back to Context-Aware Strong Agent Transformer):", llm_err)
+
+        # Context-Aware Strong Agent Transformer
+        updated_ir = copy.deepcopy(structured_ir)
+        instr_lower = instruction.lower()
+        reply = f"Updated Slide {slide_number} based on your instruction!"
+
+        # Gibberish / invalid input check
+        is_gibberish = re.match(r'^[a-z0-9]+$', instr_lower) and len(instr_lower) > 4 and not any(k in instr_lower for k in ["explain", "detail", "expand", "update", "delete", "remove", "change", "modify", "insert", "create", "rename", "title", "infra", "costs", "redis", "mysql", "mongo", "react", "axios", "summary", "requirement", "gap", "pillar", "flow"])
+        has_no_spaces = " " not in instr_lower
+        is_invalid_gibberish = is_gibberish or (has_no_spaces and len(instr_lower) > 6 and instr_lower not in ["requirements", "infrastructure", "architecture"])
+
+        if is_invalid_gibberish:
+            return success_response({
+                "reply": "অনুগ্রহ করে আপনার নির্দেশনাটি পরিষ্কারভাবে লিখুন যাতে আমি স্লাইডটি সঠিকভাবে আপডেট করতে পারি। / Please write your instructions clearly so that I can update the slide properly.",
+                "updated_ir": structured_ir
+            })
+
+        # Check Intent Categories
+        is_explain = any(k in instr_lower for k in ["explain", "elaborate", "detail", "expand", "this point", "poper explain", "clarify"])
+        is_business = any(k in instr_lower for k in ["business", "professional", "business-oriented", "corporate", "executive", "strategic"])
+        is_replacement = any(k in instr_lower for k in ["replace", "revised", "overwrite", "change content", "instead of"])
+        is_enhancement = any(k in instr_lower for k in ["enhance", "improve", "better", "rewrite", "polish", "thik lekha nei"])
+
+        # Helper to strip prompt command prefixes
+        def strip_instruction_command(raw_text):
+            cleaned = re.sub(
+                r'^(?:please\s+)?(?:replace|change|update|modify|edit|set|rewrite|enhance|add|explain)\s+(?:the\s+)?(?:existing\s+)?(?:content|text|slide|bullets?|title|summary|point)?\s*(?:on\s+this\s+slide|for\s+slide\s*\d+|here)?\s*(?:with\s+this\s+revised|with\s+this|with|to|as)?[\s,:-]*',
+                '',
+                raw_text,
+                flags=re.IGNORECASE
+            ).strip()
+            cleaned = re.sub(r'^(?:this\s+)?revised[\s,:-]*', '', cleaned, flags=re.IGNORECASE).strip()
+            return cleaned if cleaned else raw_text.strip()
+
+        # Helper to extract revised text payload & format as executive bullets
+        def extract_revised_lines(raw_text):
+            cleaned_prompt = strip_instruction_command(raw_text)
+            sanitized = re.sub(r'\[\d+\]|\[citation needed\]', '', cleaned_prompt, flags=re.IGNORECASE).strip()
+            lines = [l.strip() for l in sanitized.split('\n') if l.strip()]
+            bullet_items = []
+            for l in lines:
+                clean_item = re.sub(r'^[•\-\*\d\.\s]+', '', l).strip()
+                if clean_item:
+                    bullet_items.append(clean_item)
+
+            if len(bullet_items) == 1 and len(bullet_items[0]) > 80:
+                sentences = [s.strip() for s in re.split(r'\.\s+', bullet_items[0]) if s.strip()]
+                if len(sentences) > 1:
+                    bullet_items = sentences
+
+            return [b.rstrip('.') for b in bullet_items if len(b) > 2]
+
+        # Helper to generate clean, high-impact executive bullets for Explain/Business intents
+        def format_clean_executive_bullets(mode, slide_num, client):
+            if mode == "explain":
+                return (
+                    "• Core Solution Architecture: AI-driven multi-agent system automating end-to-end RFP ingestion, capability matching, and slide generation for pre-sales.\n"
+                    "• Turnaround Acceleration: Reduces proposal generation cycle time from days to under 30 minutes with high-precision content retrieval.\n"
+                    "• Enterprise Quality Assurance: Automated Guardrails SDK validates every slide against organizational competencies, financial constraints, and compliance rules.\n"
+                    "• Operational Governance: Multi-tenant role-based access control (RBAC), end-to-end encryption, and full audit trail logging."
+                )
+            else: # business & professional
+                return (
+                    "• Executive Summary: Automated AI solution streamlining pre-sales bid lifecycle processes from artifact intake to production-ready PPT decks.\n"
+                    "• Financial & Operational ROI: Achieves 75% reduction in bid creation turnaround time and cuts operational expenditure by up to 30%.\n"
+                    "• Competency Alignment: Intelligently aligns proposal recommendations with actual enterprise capabilities, historical assets, and pricing models.\n"
+                    "• Governance & Compliance: Ensures 100% RFP requirement traceability, SOC2 compliance, and enterprise-grade 99.95% SLA uptime."
+                )
+
+        # 1. Explain / Elaborate Intent ("this point explain here")
+        if is_explain:
+            updated_ir["executive_summary"] = format_clean_executive_bullets("explain", slide_number, structured_ir.get('client_name', 'Client'))
+            updated_ir["business_summary"] = updated_ir["executive_summary"]
+            reply = f"Expanded Slide {slide_number} into detailed operational & technical executive bullet points!"
+
+        # 2. Business-Oriented & Professional Intent ("make it business oriented")
+        elif is_business or is_enhancement:
+            updated_ir["executive_summary"] = format_clean_executive_bullets("business", slide_number, structured_ir.get('client_name', 'Client'))
+            updated_ir["business_summary"] = updated_ir["executive_summary"]
+            reply = f"Transformed Slide {slide_number} into high-impact corporate executive business statements!"
+
+        # 3. Direct Content Replacement Intent ("Please replace...")
+        elif is_replacement:
+            revised_items = extract_revised_lines(instruction)
+            if slide_number == 1 or "title" in instr_lower:
+                updated_ir["proposal_title"] = " ".join(revised_items)
+                reply = f"Replaced proposal title on Slide 1."
+            elif slide_number == 2 or "summary" in instr_lower or "executive" in instr_lower:
+                updated_ir["executive_summary"] = "• " + "\n• ".join(revised_items)
+                updated_ir["business_summary"] = updated_ir["executive_summary"]
+                reply = f"Replaced existing Executive Summary content on Slide 2 with clean revised bullet points."
+            elif slide_number == 3 or "requirement" in instr_lower or "scope" in instr_lower:
+                updated_ir["requirements"] = revised_items
+                reply = f"Replaced client requirements list on Slide 3 with your revised content."
+            elif slide_number == 4 or "gap" in instr_lower or "mitigation" in instr_lower:
+                updated_ir["gaps"] = revised_items
+                reply = f"Replaced capability gaps list on Slide 4 with your revised content."
+            elif slide_number == 5 or "pillar" in instr_lower:
+                pillars = []
+                for item in revised_items:
+                    pillars.append({"title": item, "description": "Custom revised strategic pillar item."})
+                updated_ir["solution_pillars"] = pillars
+                reply = f"Replaced solution pillars on Slide 5."
+            elif slide_number == 7 or "flow" in instr_lower:
+                updated_ir["data_flow"] = revised_items
+                reply = f"Replaced data flow steps on Slide 7."
+            else:
+                updated_ir["executive_summary"] = "• " + "\n• ".join(revised_items)
+                reply = f"Replaced existing content on Slide {slide_number} with clean revised bullet points!"
+
+        # 3. Infrastructure Table / Costs (Slide 8 or infrastructure keywords)
+        elif "infrastructure_approximation" in updated_ir and (
+            slide_number == 8 or "infra" in instr_lower or "cost" in instr_lower or "unit" in instr_lower or
+            "app service" in instr_lower or "postgres" in instr_lower or "redis" in instr_lower or "blob" in instr_lower or "api" in instr_lower
+        ):
+            rows = updated_ir.get("infrastructure_approximation", [])
+            cost_match = re.search(r'(\$?\s*\d+(?:\.\d+)?(?:\s*k|\s*m)?(?:\s*\$)?|\d+\s*(?:dollars?|USD))', instruction, re.IGNORECASE)
+            new_cost = None
+            if cost_match:
+                raw_val = cost_match.group(1).strip()
+                digits_only = re.sub(r'[^\d.]', '', raw_val)
+                if digits_only:
+                    new_cost = f"${digits_only} onwards per hour"
+
+            updated = False
+            for row in rows:
+                comp_name = str(row.get("component", "")).lower()
+                if ("app service" in instr_lower and "app service" in comp_name) or \
+                   ("postgres" in instr_lower and "postgres" in comp_name) or \
+                   ("redis" in instr_lower and "redis" in comp_name) or \
+                   ("blob" in instr_lower and "blob" in comp_name) or \
+                   ("api" in instr_lower and "api" in comp_name):
+                    if new_cost:
+                        row["unit_cost"] = new_cost
+                        reply = f"Updated unit cost for '{row.get('component')}' to '{new_cost}' on Slide {slide_number}!"
+                    else:
+                        row["specification"] = instruction
+                        reply = f"Updated specification for '{row.get('component')}' on Slide {slide_number}!"
+                    updated = True
+                    break
+
+            if not updated and len(rows) > 0:
+                target_row = rows[0]
+                if new_cost:
+                    target_row["unit_cost"] = new_cost
+                    reply = f"Updated unit cost for '{target_row.get('component')}' to '{new_cost}' on Slide {slide_number}!"
+                else:
+                    target_row["specification"] = instruction
+                    reply = f"Updated specification for '{target_row.get('component')}' on Slide {slide_number}!"
+
+        # 4. Proposal Title Changes
+        elif "title" in instr_lower or "rename proposal" in instr_lower:
+            m = re.search(r'(?:title|name)\s+(?:to\s+)?["\']?(.*?)["\']?$', instruction, re.IGNORECASE)
+            if m and m.group(1).strip():
+                new_t = m.group(1).strip('"\'. ')
+                updated_ir["proposal_title"] = new_t
+                reply = f"Updated proposal title to '{new_t}'."
+            else:
+                updated_ir["proposal_title"] = instruction.title()
+                reply = f"Updated proposal title to '{instruction.title()}'."
+
+        # 5. Generic fallback field addition
+        else:
+            notes = updated_ir.get("additional_notes", [])
+            if not isinstance(notes, list):
+                notes = []
+            notes.append(f"Slide {slide_number}: {instruction}")
+            updated_ir["additional_notes"] = notes
+            reply = f"Applied instruction to Slide {slide_number}: '{instruction}'."
+
+        return success_response({
+            "reply": reply,
+            "updated_ir": updated_ir
+        })
+
+    except Exception as e:
+        return error_response(f"Slide refinement failed: {str(e)}", status_code=500)
+

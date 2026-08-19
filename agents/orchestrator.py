@@ -361,6 +361,68 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
                 }
                 arango_client.insert("documents", doc_record)
 
+        # Process additional_context if provided in the database
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+            cursor.execute("SELECT additional_context FROM proposals WHERE id = %s", (proposal_id,))
+            row = cursor.fetchone()
+            cursor.close()
+            conn.close()
+            
+            if row:
+                additional_context = row.get("additional_context") if isinstance(row, dict) else row[0]
+                if additional_context and additional_context.strip():
+                    txt = f"--- Additional Context / Notes ---\n{additional_context.strip()}"
+                    orig_name = "Additional_Context"
+                    parsed_files += 1
+                    extracted_text_blocks.append(txt)
+                    
+                    # Smart Chunking and Classification
+                    chunks = chunk_text(txt, chunk_size=1000, overlap=100)
+                    from database.vector_client import store_embedding
+                    for idx, chunk in enumerate(chunks):
+                        classification = intake_agent.classify_chunk(chunk)
+                        embedding = get_embedding(chunk)
+                        chunk_id = f"{proposal_id}_{orig_name}_{idx}"
+                        
+                        # Save to ArangoDB chunks collection
+                        if arango_client.is_connected:
+                            chunk_doc = {
+                                "_key": chunk_id,
+                                "proposal_id": proposal_id,
+                                "filename": orig_name,
+                                "chunk_index": idx,
+                                "text": chunk,
+                                "classification": classification,
+                                "embedding": embedding
+                            }
+                            arango_client.insert("chunks", chunk_doc)
+                        
+                        # Save to ChromaDB
+                        store_embedding(
+                            collection_name="chunks",
+                            doc_id=chunk_id,
+                            text=chunk,
+                            metadata={
+                                "proposal_id": proposal_id,
+                                "filename": orig_name,
+                                "classification": classification
+                            }
+                        )
+                        total_chunks_stored += 1
+                    
+                    # Save document record to ArangoDB
+                    if arango_client.is_connected:
+                        doc_record = {
+                            "proposal_id": proposal_id,
+                            "filename": orig_name,
+                            "character_count": len(txt)
+                        }
+                        arango_client.insert("documents", doc_record)
+        except Exception as e:
+            print(f"Error loading additional context: {e}")
+
         # Process case study documents if provided
         structured_case_studies = []
         parsed_case_study_files = 0
@@ -478,7 +540,8 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "guardrail_options": advanced_options.get("guardrail_options", []),
             "case_study_text": full_case_study_text,
             "structured_case_studies": structured_case_studies,
-            "ppt_template_path": ppt_template_path
+            "ppt_template_path": ppt_template_path,
+            "full_document_text": full_document_text[:10000]
         }
         update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
         
@@ -529,29 +592,79 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         structured_case_studies = partial_state.get("structured_case_studies", [])
         ppt_template_path = partial_state.get("ppt_template_path", None)
         
-        # Retrieve persistent case studies from DB
+        full_document_text = partial_state.get("full_document_text", "")
+        if not full_document_text and files_info:
+            extracted_texts = []
+            for file_data in files_info:
+                saved_path = file_data.get("saved_path")
+                if saved_path and os.path.exists(saved_path):
+                    txt = extract_text(saved_path)
+                    if txt:
+                        extracted_texts.append(txt)
+            full_document_text = "\n\n".join(extracted_texts).strip()
+
+        # Retrieve persistent case studies from DB if none were uploaded
         db_case_study_text = ""
         db_case_studies_list = []
-        try:
-            conn = get_db_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT name, description FROM knowledge_assets WHERE category = 'Case Study' ORDER BY created_at DESC")
-            db_rows = cursor.fetchall()
-            cursor.close()
-            conn.close()
-            
-            db_case_studies = []
-            for r in db_rows:
-                try:
-                    desc_obj = json.loads(r["description"])
-                    db_case_studies_list.append(desc_obj)
-                    db_case_studies.append(f"--- Previous Project Case Study: {r['name']} ---\n" + json.dumps(desc_obj, indent=2))
-                except:
-                    pass
-            db_case_study_text = "\n\n".join(db_case_studies)
-        except Exception as db_err:
-            print(f"Error fetching persistent case studies: {db_err}")
-            
+        if not structured_case_studies:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute("SELECT name, description, capabilities FROM knowledge_assets WHERE category = 'Case Study'")
+                db_rows = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if db_rows:
+                    candidate_case_studies = []
+                    for r in db_rows:
+                        try:
+                            desc_obj = json.loads(r["description"])
+                            candidate_case_studies.append({
+                                "name": r["name"],
+                                "description": r["description"],
+                                "capabilities": r.get("capabilities", ""),
+                                "desc_obj": desc_obj
+                            })
+                        except:
+                            pass
+                            
+                    # Keyword matching boost
+                    req_query = " ".join(requirements)
+                    req_query_lower = req_query.lower()
+                    
+                    for c in candidate_case_studies:
+                        c["score_boost"] = 0.0
+                        caps = c.get("capabilities", "")
+                        if caps:
+                            cap_list = [cap.strip().lower() for cap in str(caps).split(",")]
+                            for cap in cap_list:
+                                if cap and cap in req_query_lower:
+                                    c["score_boost"] += 0.2
+                                    
+                    # Semantic search
+                    from database.vector_client import get_embedding, cosine_similarity
+                    query_emb = get_embedding(req_query)
+                    
+                    scored_cs = []
+                    for c in candidate_case_studies:
+                        c_emb = get_embedding(f"{c['name']} {c['description']}")
+                        sim = cosine_similarity(query_emb, c_emb)
+                        total_score = sim + c.get("score_boost", 0.0)
+                        scored_cs.append((total_score, c))
+                        
+                    scored_cs.sort(key=lambda x: x[0], reverse=True)
+                    top_cs = [item[1] for item in scored_cs[:2]]
+                    
+                    db_case_studies = []
+                    for c in top_cs:
+                        db_case_studies_list.append(c["desc_obj"])
+                        db_case_studies.append(f"--- Previous Project Case Study: {c['name']} ---\n" + json.dumps(c["desc_obj"], indent=2))
+                    
+                    db_case_study_text = "\n\n".join(db_case_studies)
+            except Exception as db_err:
+                print(f"Error fetching persistent case studies: {db_err}")
+                
         combined_case_study_text = ""
         if case_study_text:
             combined_case_study_text += case_study_text
@@ -578,7 +691,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             selected_rag=selected_rag,
             selected_guardrail=selected_guardrail,
             selected_action_engine=selected_action_engine,
-            case_study_text=combined_case_study_text
+            case_study_text=combined_case_study_text,
+            full_rfp_text=full_document_text[:6000]
         )
         solution_pillars = design_data.get("solution_pillars", [])
         architecture = design_data.get("architecture", [])

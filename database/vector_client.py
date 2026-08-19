@@ -17,24 +17,24 @@ if not MISTRAL_LOCAL_URL or not MISTRAL_LOCAL_MODEL:
 # Cache to prevent repeated log warnings or timeouts
 _MISTRAL_EMBEDDING_SUPPORTED = True
 
-def _local_hash_vectorizer(text):
+def _local_hash_vectorizer(text, dimension=384):
     """
-    Fallback vectorizer: L2-normalized 128-dimensional term frequency mapping.
+    Fallback vectorizer: L2-normalized term frequency mapping.
     Uses polynomial feature hashing to guarantee deterministic and package-free vector matching.
     """
     if not text:
-        return [0.0] * 128
+        return [0.0] * dimension
         
     # Preprocess text (lowercase and tokenize)
     words = text.lower().replace('\n', ' ').replace('\r', ' ').split()
-    vector = [0.0] * 128
+    vector = [0.0] * dimension
     
     # Feature hashing
     for word in words:
         # Polynomial rolling hash
         h = 0
         for char in word:
-            h = (h * 31 + ord(char)) % 128
+            h = (h * 31 + ord(char)) % dimension
         vector[h] += 1.0
         
     # L2 Normalization
@@ -44,54 +44,73 @@ def _local_hash_vectorizer(text):
         
     return vector
 
-def get_embedding(text):
+def get_embedding(text, dimension=384):
+    emb = _get_embedding_raw(text, dimension=dimension)
+    if hasattr(emb, "tolist"):
+        emb = emb.tolist()
+    elif hasattr(emb, "numpy"):
+        emb = emb.numpy().tolist()
+    elif isinstance(emb, list):
+        emb = [float(x) for x in emb]
+    return emb
+
+def _get_embedding_raw(text, dimension=384):
     """
-    Fetches embedding from local Mistral server, falling back to local hash vectorizer if unavailable.
+    Fetches embedding from local Mistral server, falling back to Chroma's default embedding function,
+    and finally to a local hash vectorizer of the requested dimension if everything else fails.
     """
     global _MISTRAL_EMBEDDING_SUPPORTED
     
-    if not _MISTRAL_EMBEDDING_SUPPORTED:
-        return _local_hash_vectorizer(text)
+    if _MISTRAL_EMBEDDING_SUPPORTED:
+        url_ollama = f"{MISTRAL_LOCAL_URL}/api/embeddings"
+        headers = {"Content-Type": "application/json"}
+        payload_ollama = {
+            "model": MISTRAL_LOCAL_MODEL,
+            "prompt": text
+        }
         
-    url_ollama = f"{MISTRAL_LOCAL_URL}/api/embeddings"
-    headers = {"Content-Type": "application/json"}
-    payload_ollama = {
-        "model": MISTRAL_LOCAL_MODEL,
-        "prompt": text
-    }
-    
-    try:
-        res = requests.post(url_ollama, json=payload_ollama, headers=headers, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            embedding = data.get("embedding")
-            if embedding:
-                return embedding
-    except Exception:
-        pass
+        try:
+            res = requests.post(url_ollama, json=payload_ollama, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                embedding = data.get("embedding")
+                if embedding and len(embedding) == dimension:
+                    return embedding
+        except Exception:
+            pass
 
-    url_openai = f"{MISTRAL_LOCAL_URL}/v1/embeddings"
-    payload_openai = {
-        "model": MISTRAL_LOCAL_MODEL,
-        "input": text
-    }
-    
-    try:
-        res = requests.post(url_openai, json=payload_openai, headers=headers, timeout=5)
-        if res.status_code == 200:
-            data = res.json()
-            embedding = data.get("data", [{}])[0].get("embedding")
-            if embedding:
-                return embedding
-        elif res.status_code == 501:
-            print("Mistral embedding failed with status 501. Caching hash-vector fallback.")
-            _MISTRAL_EMBEDDING_SUPPORTED = False
-    except Exception as e:
-        # Silently degrade to hash vectorizer and log warning
-        print(f"Error querying Mistral embedding endpoint. Falling back to local vectorizer. Error: {e}")
-        _MISTRAL_EMBEDDING_SUPPORTED = False
+        url_openai = f"{MISTRAL_LOCAL_URL}/v1/embeddings"
+        payload_openai = {
+            "model": MISTRAL_LOCAL_MODEL,
+            "input": text
+        }
         
-    return _local_hash_vectorizer(text)
+        try:
+            res = requests.post(url_openai, json=payload_openai, headers=headers, timeout=5)
+            if res.status_code == 200:
+                data = res.json()
+                embedding = data.get("data", [{}])[0].get("embedding")
+                if embedding and len(embedding) == dimension:
+                    return embedding
+            elif res.status_code == 501:
+                print("Mistral embedding failed with status 501. Caching local fallback.")
+                _MISTRAL_EMBEDDING_SUPPORTED = False
+        except Exception as e:
+            print(f"Error querying Mistral embedding endpoint: {e}")
+            _MISTRAL_EMBEDDING_SUPPORTED = False
+            
+    # Fallback 1: Chroma's DefaultEmbeddingFunction (usually 384 dimensions)
+    try:
+        from chromadb.utils import embedding_functions
+        default_ef = embedding_functions.DefaultEmbeddingFunction()
+        embeddings = default_ef([text])
+        if embeddings and len(embeddings[0]) == dimension:
+            return embeddings[0]
+    except Exception as ef:
+        print(f"Chroma default embedding function failed: {ef}")
+
+    # Fallback 2: Local Hash Vectorizer matching the expected dimension
+    return _local_hash_vectorizer(text, dimension=dimension)
 
 import chromadb
 
@@ -104,6 +123,28 @@ def get_chroma_collection(collection_name):
         name=collection_name,
         metadata={"hnsw:space": "cosine"}
     )
+
+def get_collection_dimension(collection):
+    """Detects expected dimension of the collection from existing items or the embedding function."""
+    # 1. Try to get sample from existing documents
+    try:
+        sample = collection.get(limit=1, include=["embeddings"])
+        if sample is not None and sample.get("embeddings") is not None and len(sample["embeddings"]) > 0:
+            return len(sample["embeddings"][0])
+    except Exception:
+        pass
+
+    # 2. Try to get from embedding function
+    try:
+        if hasattr(collection, "_embedding_function") and collection._embedding_function is not None:
+            test_emb = collection._embedding_function(["test"])
+            if test_emb and len(test_emb[0]) > 0:
+                return len(test_emb[0])
+    except Exception:
+        pass
+
+    # 3. Default fallback
+    return 384
 
 def chunk_text(text, chunk_size=300, overlap=50):
     """Splits text into chunks of `chunk_size` words with an overlap of `overlap` words."""
@@ -124,6 +165,7 @@ def chunk_text(text, chunk_size=300, overlap=50):
 def store_embedding(collection_name, doc_id, text, metadata=None):
     """Stores text by chunking it, getting embeddings for each chunk, and storing in a ChromaDB collection with metadata."""
     collection = get_chroma_collection(collection_name)
+    dimension = get_collection_dimension(collection)
     
     chunks = chunk_text(text, chunk_size=300, overlap=50)
     if not chunks:
@@ -136,7 +178,7 @@ def store_embedding(collection_name, doc_id, text, metadata=None):
     
     for idx, chunk in enumerate(chunks):
         chunk_id = f"{doc_id}_chunk_{idx}"
-        emb = get_embedding(chunk)
+        emb = get_embedding(chunk, dimension=dimension)
         
         chunk_meta = metadata.copy() if metadata else {}
         chunk_meta["chunk_index"] = idx
@@ -158,7 +200,8 @@ def store_embedding(collection_name, doc_id, text, metadata=None):
 def search_embeddings(collection_name, query, n_results=3):
     """Searches the ChromaDB collection for the nearest neighbors to the query."""
     collection = get_chroma_collection(collection_name)
-    query_emb = get_embedding(query)
+    dimension = get_collection_dimension(collection)
+    query_emb = get_embedding(query, dimension=dimension)
     
     try:
         results = collection.query(
@@ -202,7 +245,15 @@ def retrieve_nearest(query, candidates, top_n=3):
     """
     Legacy method for in-memory searching over a list of candidate dictionaries.
     """
-    query_emb = get_embedding(query)
+    # Detect candidate embedding dimension to match query
+    dimension = 384
+    for c in candidates:
+        emb = c.get("embedding")
+        if emb:
+            dimension = len(emb)
+            break
+            
+    query_emb = get_embedding(query, dimension=dimension)
     scored = []
     
     for c in candidates:
@@ -210,7 +261,7 @@ def retrieve_nearest(query, candidates, top_n=3):
         if not emb:
             name = c.get("name", "")
             desc = c.get("description", "")
-            emb = get_embedding(f"{name} {desc}")
+            emb = get_embedding(f"{name} {desc}", dimension=dimension)
             c["embedding"] = emb
             
         sim = cosine_similarity(query_emb, emb)
