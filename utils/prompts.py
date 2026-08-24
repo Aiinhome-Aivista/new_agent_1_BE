@@ -21,6 +21,7 @@ INTAKE_AGENT_PROMPT_0 = ChatPromptTemplate.from_messages([
         ])
 
 # Extracted from intake_agent.py
+
 # This prompt extracts metadata like Client Name, Project Duration, and Budget from an RFP document.
 INTAKE_AGENT_PROMPT_1 = ChatPromptTemplate.from_messages([
             ("system", (
