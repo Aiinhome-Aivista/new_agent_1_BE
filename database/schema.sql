@@ -72,3 +72,16 @@ INSERT IGNORE INTO knowledge_assets (name, description, category, capabilities) 
 -- -------------------------------------------------------
 -- Migration queries have been removed because MySQL does not support ADD COLUMN IF NOT EXISTS.
 -- The columns are already included in the CREATE TABLE proposals statement.
+
+CREATE TABLE IF NOT EXISTS document_analysis (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    proposal_id VARCHAR(50) NOT NULL,
+    document_name VARCHAR(255),
+    document_type VARCHAR(100),
+    analysis_json JSON,
+    analysis_version VARCHAR(20) DEFAULT '1.0',
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (proposal_id) REFERENCES proposals(id) ON DELETE CASCADE
+);

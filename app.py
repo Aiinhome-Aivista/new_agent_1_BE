@@ -99,6 +99,10 @@ def get_proposal_status(proposal_id):
     # All roles can view status
     return proposal_controller.get_proposal_status(proposal_id)
 
+@app.route('/api/proposals/<proposal_id>/analysis', methods=['GET'])
+def get_document_analysis(proposal_id):
+    return proposal_controller.get_document_analysis(proposal_id)
+
 @app.route('/api/proposals/<proposal_id>/pause', methods=['POST'])
 @require_role('presales', 'bidmanager', 'admin')
 def pause_proposal_job(proposal_id):

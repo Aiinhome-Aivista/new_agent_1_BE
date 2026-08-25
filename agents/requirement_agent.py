@@ -210,31 +210,41 @@ class RequirementAgent:
     def analyze_document_content(self, text: str) -> dict:
         """
         Generic document content analysis capability.
-        Extracts various sections like Executive Summary, Business Objectives, Workflow, Architecture, etc.
+        Extracts various sections like Business Objectives, Workflow, Architecture, etc.
+        Returns a structured JSON representing the document.
         """
         prompt = DOCUMENT_CONTENT_ANALYSIS_PROMPT
         chain = prompt | self.llm_json
         
         default_res = {
-            "executive_summary": [],
+            "document": {"title": "", "type": "", "domain": "", "summary": ""},
+            "sections": [],
             "business_objectives": [],
-            "functional_requirements": [],
-            "technical_requirements": [],
+            "scope": {"in_scope": [], "out_of_scope": []},
+            "requirements": {"functional": [], "technical": []},
+            "current_state": [],
+            "target_state": [],
             "workflow": [],
-            "agents": [],
-            "architecture": [],
-            "data_flow": [],
+            "architecture": {"components": [], "relationships": [], "reference_architecture": {}, "landscape_architecture": {}},
+            "data": {"sources": [], "data_flow": [], "storage": [], "transformation": [], "modelling": []},
             "technology": [],
             "integrations": [],
             "security": [],
-            "rag": [],
-            "llm": [],
-            "memory": [],
-            "metrics": [],
-            "limitations": [],
+            "governance": [],
+            "data_quality": [],
+            "performance": [],
+            "scalability": [],
+            "monitoring": [],
+            "availability": [],
+            "disaster_recovery": [],
+            "deployment": [],
+            "cicd": [],
+            "implementation_roadmap": [],
+            "cost": {"specified_in_document": False, "details": []},
+            "risks": [],
             "assumptions": [],
-            "cost_information": [],
-            "implementation_information": []
+            "dependencies": [],
+            "open_questions": []
         }
         
         try:

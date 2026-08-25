@@ -1117,3 +1117,50 @@ Ensure the returned JSON is valid and complete.
     except Exception as e:
         return error_response(f"Slide refinement failed: {str(e)}", status_code=500)
 
+def get_document_analysis(proposal_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+        cursor.execute(
+            "SELECT id, proposal_id, document_name, document_type, analysis_json, analysis_version, status, created_at, updated_at FROM document_analysis WHERE proposal_id = %s ORDER BY id DESC LIMIT 1",
+            (proposal_id,)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if not row:
+            return error_response("Document analysis not found", status_code=404)
+            
+        # Convert row to dictionary if not already
+        if not isinstance(row, dict):
+            row = {
+                "id": row[0],
+                "proposal_id": row[1],
+                "document_name": row[2],
+                "document_type": row[3],
+                "analysis_json": row[4],
+                "analysis_version": row[5],
+                "status": row[6],
+                "created_at": row[7],
+                "updated_at": row[8]
+            }
+            
+        # Parse JSON
+        if row.get("analysis_json"):
+            try:
+                row["analysis"] = json.loads(row["analysis_json"]) if isinstance(row["analysis_json"], str) else row["analysis_json"]
+                del row["analysis_json"]
+            except Exception as e:
+                row["analysis"] = {}
+                
+        # Format dates
+        if row.get("created_at"):
+            row["created_at"] = format_datetime(row["created_at"])
+        if row.get("updated_at"):
+            row["updated_at"] = format_datetime(row["updated_at"])
+            
+        return success_response(row)
+        
+    except Exception as e:
+        return error_response(f"Failed to fetch analysis: {str(e)}", status_code=500)

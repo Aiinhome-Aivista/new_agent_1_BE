@@ -43,6 +43,7 @@ def classify_chunk(chunk_content):
 # Define the step list in order
 STEPS = [
     "Ingesting",
+    "Understanding",
     "Analyzing",
     "Designing",
     "Planning",
@@ -500,6 +501,51 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
 
         logs = f"Parsed {parsed_files} document(s). Generated and indexed {total_chunks_stored} text chunks in ArangoDB."
         update_step_status(proposal_id, "Ingesting", "completed", logs)
+
+        # ----------------------------------------------------
+        # 1.5 DOCUMENT UNDERSTANDING AGENT
+        # ----------------------------------------------------
+        if "Understanding" not in completed_steps:
+            update_step_status(proposal_id, "Understanding", "running", "Analyzing document content and persisting to database...")
+        
+        try:
+            doc_analysis_json = req_agent.analyze_document_content(full_document_text)
+            
+            # Simple Validation: check for the 'document' root key
+            if not isinstance(doc_analysis_json, dict) or "document" not in doc_analysis_json:
+                raise ValueError("JSON Validation Failed: Invalid document structure")
+                
+            # Get latest version for this proposal_id
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT analysis_version FROM document_analysis WHERE proposal_id = %s ORDER BY id DESC LIMIT 1", (proposal_id,))
+            row = cursor.fetchone()
+            next_version = "1.0"
+            if row and row[0]:
+                try:
+                    next_version = str(round(float(row[0]) + 1.0, 1))
+                except:
+                    next_version = "2.0"
+                    
+            doc_type = doc_analysis_json.get("document", {}).get("type", "Unknown")
+            cursor.execute(
+                "INSERT INTO document_analysis (proposal_id, document_name, document_type, analysis_json, analysis_version, status) VALUES (%s, %s, %s, %s, %s, %s)",
+                (proposal_id, "Combined_Document", doc_type, json.dumps(doc_analysis_json), next_version, "completed")
+            )
+            conn.commit()
+            
+            logs = f"Document content analyzed successfully and saved to database (version {next_version})."
+            update_step_status(proposal_id, "Understanding", "completed", logs)
+        except Exception as e:
+            print(f"Error in document understanding and persistence: {e}")
+            update_step_status(proposal_id, "Understanding", "failed", f"Failed to persist analysis: {e}")
+            if 'conn' in locals() and conn:
+                conn.rollback()
+        finally:
+            if 'cursor' in locals() and cursor:
+                cursor.close()
+            if 'conn' in locals() and conn:
+                conn.close()
 
         # ----------------------------------------------------
         # 2. KNOWLEDGE AGENT (LLM Requirement Extraction & RAG mapping)

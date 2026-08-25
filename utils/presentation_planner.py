@@ -35,11 +35,27 @@ class PresentationPlanner:
             {"type": "thank_you", "title": "Thank You"}
         ]
 
-    def plan_presentation(self, doc_understanding: dict, content_analysis: dict) -> dict:
+    def plan_presentation(self, proposal_id: str, doc_understanding: dict) -> dict:
         """
-        Receives Document Understanding and Content Analysis outputs.
-        Generates a structured presentation plan (dynamic slides + mandatory slides).
+        Fetches Document Analysis from database and generates a structured presentation plan.
         """
+        # Fetch persisted analysis from database
+        from database.db_connection import get_db_connection
+        content_analysis = {}
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
+            cursor.execute("SELECT analysis_json FROM document_analysis WHERE proposal_id = %s ORDER BY id DESC LIMIT 1", (proposal_id,))
+            row = cursor.fetchone()
+            if row:
+                analysis_raw = row.get('analysis_json') if isinstance(row, dict) else row[0]
+                if analysis_raw:
+                    content_analysis = json.loads(analysis_raw) if isinstance(analysis_raw, str) else analysis_raw
+            cursor.close()
+            conn.close()
+        except Exception as e:
+            print(f"Error fetching document analysis for planner: {e}")
+            
         prompt = PRESENTATION_PLANNER_PROMPT
         chain = prompt | self.llm_json
         
