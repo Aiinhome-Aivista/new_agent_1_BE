@@ -291,3 +291,61 @@ PRICING_KB_SYS_PROMPT_2 = (
         "Do not include markdown or explanations."
     )
 
+# ==========================================
+# GENERIC DOCUMENT UNDERSTANDING PROMPTS
+# ==========================================
+
+DOCUMENT_UNDERSTANDING_PROMPT = ChatPromptTemplate.from_messages([
+            ("system", (
+                "You are a technical document analysis assistant.\n"
+                "Analyze the uploaded document regardless of whether it is an Architecture Specification, HLA, LLD, Technical Design, RFP, Project Proposal, Case Study, Product Specification, or Requirements Document.\n"
+                "Extract only information supported by the source document. Do not invent unsupported facts.\n\n"
+                "Respond ONLY with a JSON object containing the following keys:\n"
+                "- 'document_type': string (e.g. 'RFP', 'Technical Design', 'High-Level Architecture', 'Low-Level Design', 'Solution Architecture', 'Project Proposal', 'Case Study', 'Product Specification', 'Requirements Specification', 'Migration Architecture', 'AI/ML Architecture', 'Other Technical Document')\n"
+                "- 'title': string\n"
+                "- 'domain': string\n"
+                "- 'summary': string (brief summary)\n"
+                "- 'sections_present': list of strings\n"
+                "- 'has_architecture': boolean\n"
+                "- 'has_workflow': boolean\n"
+                "- 'has_security': boolean\n"
+                "- 'has_technology': boolean\n"
+                "- 'has_cost': boolean\n"
+                "- 'has_implementation_plan': boolean\n"
+                "- 'has_rag': boolean\n"
+                "- 'cloud_provider': string ('AWS', 'Azure', 'GCP', 'On-Prem', or 'Not Specified')\n"
+                "Do not include any explanation or markdown formatting outside the JSON."
+            )),
+            ("user", "Document Text:\n\n{text}")
+        ])
+
+DOCUMENT_CONTENT_ANALYSIS_PROMPT = ChatPromptTemplate.from_messages([
+            ("system", (
+                "You are a generic document content analysis assistant.\n"
+                "Analyze the uploaded document and extract the following content into a structured format.\n"
+                "If information for a field is not present, use an empty list.\n\n"
+                "Respond ONLY with a JSON object containing the following keys (all values must be lists of strings):\n"
+                "- 'executive_summary'\n"
+                "- 'business_objectives'\n"
+                "- 'functional_requirements'\n"
+                "- 'technical_requirements'\n"
+                "- 'workflow'\n"
+                "- 'agents'\n"
+                "- 'architecture'\n"
+                "- 'data_flow'\n"
+                "- 'technology'\n"
+                "- 'integrations'\n"
+                "- 'security'\n"
+                "- 'rag'\n"
+                "- 'llm'\n"
+                "- 'memory'\n"
+                "- 'metrics'\n"
+                "- 'limitations'\n"
+                "- 'assumptions'\n"
+                "- 'cost_information'\n"
+                "- 'implementation_information'\n"
+                "Extract ONLY information supported by the document. Do NOT invent facts.\n"
+                "Do not include any explanation or markdown formatting outside the JSON."
+            )),
+            ("user", "Document Text:\n\n{text}")
+        ])

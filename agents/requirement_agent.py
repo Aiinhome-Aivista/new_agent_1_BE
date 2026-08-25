@@ -1,4 +1,4 @@
-from utils.prompts import REQUIREMENT_AGENT_PROMPT_0, REQUIREMENT_AGENT_PROMPT_1, REQUIREMENT_AGENT_PROMPT_2, REQUIREMENT_AGENT_PROMPT_3, REQUIREMENT_AGENT_PROMPT_4
+from utils.prompts import REQUIREMENT_AGENT_PROMPT_0, REQUIREMENT_AGENT_PROMPT_1, REQUIREMENT_AGENT_PROMPT_2, REQUIREMENT_AGENT_PROMPT_3, REQUIREMENT_AGENT_PROMPT_4, DOCUMENT_CONTENT_ANALYSIS_PROMPT
 import json
 from langchain_core.prompts import ChatPromptTemplate
 from agents.langchain_llm import get_llm
@@ -205,5 +205,49 @@ class RequirementAgent:
             }
         except Exception as e:
             print(f"Error analyzing advanced options: {e}")
+            return default_res
+
+    def analyze_document_content(self, text: str) -> dict:
+        """
+        Generic document content analysis capability.
+        Extracts various sections like Executive Summary, Business Objectives, Workflow, Architecture, etc.
+        """
+        prompt = DOCUMENT_CONTENT_ANALYSIS_PROMPT
+        chain = prompt | self.llm_json
+        
+        default_res = {
+            "executive_summary": [],
+            "business_objectives": [],
+            "functional_requirements": [],
+            "technical_requirements": [],
+            "workflow": [],
+            "agents": [],
+            "architecture": [],
+            "data_flow": [],
+            "technology": [],
+            "integrations": [],
+            "security": [],
+            "rag": [],
+            "llm": [],
+            "memory": [],
+            "metrics": [],
+            "limitations": [],
+            "assumptions": [],
+            "cost_information": [],
+            "implementation_information": []
+        }
+        
+        try:
+            res = chain.invoke({"text": text[:12000]})
+            content = res.content.strip()
+            if content.startswith("```json"):
+                content = content[7:]
+            if content.endswith("```"):
+                content = content[:-3]
+            content = content.strip()
+            parsed = json.loads(content)
+            return parsed
+        except Exception as e:
+            print(f"Error analyzing document content: {e}")
             return default_res
 

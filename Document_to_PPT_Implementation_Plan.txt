@@ -1,0 +1,1325 @@
+IMPLEMENTATION PLAN
+Document-to-Presentation Generator
+Current Project Refactoring Plan
+
+============================================================
+1. OBJECTIVE
+============================================================
+
+Transform the current Proposal/RFP-focused presentation generator into a
+generic Document-to-PPT Generator.
+
+Target behavior:
+
+User uploads any technical/project document
+        |
+        v
+Document Understanding
+        |
+        v
+Content Analysis
+        |
+        v
+Dynamic Slide Planning
+        |
+        +-----------------------------+
+        |                             |
+        v                             v
+Document-specific slides       Mandatory common slides
+                                      |
+                                      +-- Technology
+                                      +-- Cost
+                                      +-- Reference Architecture
+                                      +-- Landscape Architecture
+                                      +-- Thank You
+        |
+        v
+Presentation IR
+        |
+        v
+PPTX Renderer
+        |
+        v
+Final PPT
+
+
+CORE REQUIREMENT
+----------------
+
+The uploaded document determines the content and dynamic slides.
+
+The following slides must always be present:
+
+1. Technology Stack
+2. Cost Estimation
+3. Reference Architecture
+4. Landscape Architecture
+5. Thank You
+
+
+============================================================
+2. CURRENT PROJECT APPROACH
+============================================================
+
+The current project already contains reusable components such as:
+
+- Document upload/extraction
+- Intake/analysis agents
+- Requirement analysis
+- Design agent
+- Orchestration
+- LLM abstraction
+- RAG/vector storage
+- PPTX generation
+- Reference architecture generation
+- Landscape architecture generation
+- Structured JSON IR
+- Proposal workflow/API
+- Pause/resume/cancel workflow support
+
+Therefore, the project should NOT be rewritten from scratch.
+
+The existing system should be refactored from:
+
+    Proposal/RFP -> Proposal PPT
+
+to:
+
+    Any Document -> Document-specific PPT + Mandatory Common Slides
+
+
+============================================================
+3. PHASE 0 - BACKUP AND BASELINE
+============================================================
+
+Goal:
+Protect the currently working application before refactoring.
+
+Tasks:
+
+1. Create a dedicated Git branch.
+
+   git checkout -b feature/document-to-ppt
+
+2. Preserve the current working version.
+
+3. Verify the current flow:
+   - Upload
+   - Processing
+   - PPT generation
+   - PPT download
+
+4. Keep existing RFP/proposal behavior working during migration.
+
+Expected Result:
+A safe rollback point and a working baseline.
+
+
+============================================================
+4. PHASE 1 - GENERIC DOCUMENT UNDERSTANDING
+============================================================
+
+Current problem:
+The Intake Agent is heavily oriented toward RFP/proposal content.
+
+Current classification includes concepts such as:
+- Background
+- Requirements
+- Financial & Sizing
+- Compliance & Security
+- Other
+
+New requirement:
+The system must understand any technical/project document.
+
+Create:
+
+    agents/document_understanding_agent.py
+
+Responsibilities:
+
+1. Identify document type.
+
+Possible types:
+
+- RFP
+- Technical Design
+- High-Level Architecture
+- Low-Level Design
+- Solution Architecture
+- Project Proposal
+- Case Study
+- Product Specification
+- Requirements Specification
+- Migration Architecture
+- AI/ML Architecture
+- Other Technical Document
+
+2. Extract:
+   - Document title
+   - Domain
+   - Summary
+   - Main topics
+   - Sections present
+   - Architecture presence
+   - Workflow presence
+   - Security presence
+   - Technology presence
+   - Cost presence
+   - Implementation plan presence
+   - Cloud provider
+   - Data/integration information
+
+3. Do not invent information that is not present in the source.
+
+
+Example output:
+
+{
+  "document_type": "Technical Architecture Specification",
+  "title": "...",
+  "domain": "AI / ITSM",
+  "summary": "...",
+  "sections_present": [
+    "Executive Summary",
+    "Architecture",
+    "Technology",
+    "Security"
+  ],
+  "has_architecture": true,
+  "has_workflow": true,
+  "has_security": true,
+  "has_rag": true,
+  "has_technology": true,
+  "has_cost": false,
+  "has_implementation_plan": false,
+  "cloud_provider": "Not Specified"
+}
+
+
+============================================================
+5. PHASE 2 - GENERIC CONTENT ANALYSIS
+============================================================
+
+Modify:
+
+    agents/requirement_agent.py
+
+Current requirement extraction is proposal/RFP focused.
+
+Add a generic document content analysis capability.
+
+Suggested method:
+
+    analyze_document_content()
+
+Extract:
+
+- Executive Summary
+- Business Objectives
+- Functional Requirements
+- Technical Requirements
+- Workflow
+- Agents
+- Architecture
+- Data Flow
+- Technology
+- Integrations
+- Security
+- RAG
+- LLM
+- Memory
+- Metrics
+- Risks
+- Limitations
+- Assumptions
+- Implementation information
+- Cost information
+
+Example:
+
+{
+  "executive_summary": [],
+  "business_objectives": [],
+  "functional_requirements": [],
+  "technical_requirements": [],
+  "workflow": [],
+  "agents": [],
+  "architecture": [],
+  "data_flow": [],
+  "technology": [],
+  "integrations": [],
+  "security": [],
+  "rag": [],
+  "llm": [],
+  "memory": [],
+  "metrics": [],
+  "limitations": [],
+  "assumptions": []
+}
+
+
+============================================================
+6. PHASE 3 - DOCUMENT TYPE DETECTION
+============================================================
+
+Document type must influence presentation planning.
+
+Examples:
+
+A. Cloud Migration Architecture
+
+Potential dynamic slides:
+
+- Executive Summary
+- Current State
+- Target State
+- Migration Strategy
+- Migration Phases
+- Data Migration
+- Security
+- Risks
+
+B. AI Chatbot Technical Design
+
+Potential dynamic slides:
+
+- Executive Summary
+- Business Objective
+- Conversation Flow
+- AI Architecture
+- LLM Strategy
+- RAG Architecture
+- Data Flow
+- Security
+- Evaluation Metrics
+
+C. Agentic Incident Service Desk Architecture
+
+Potential dynamic slides:
+
+- Executive Summary
+- Functional Flow
+- Multi-Agent Architecture
+- Agent Roles
+- RAG & Knowledge
+- LLM Strategy
+- Data & Integration
+- Security & Governance
+- Success Metrics
+
+Dynamic slides are only examples.
+The uploaded document must determine the final content.
+
+
+============================================================
+7. PHASE 4 - PRESENTATION PLANNER
+============================================================
+
+Create:
+
+    utils/presentation_planner.py
+
+Responsibilities:
+
+1. Receive Document Understanding output.
+2. Receive Content Analysis output.
+3. Decide which document-specific slides are relevant.
+4. Generate a structured presentation plan.
+
+Example:
+
+{
+  "slides": [
+    {
+      "type": "executive_summary",
+      "title": "Executive Summary"
+    },
+    {
+      "type": "functional_flow",
+      "title": "Functional Flow"
+    },
+    {
+      "type": "multi_agent_architecture",
+      "title": "Multi-Agent Architecture"
+    },
+    {
+      "type": "security",
+      "title": "Security & Governance"
+    },
+    {
+      "type": "success_metrics",
+      "title": "Success Metrics"
+    }
+  ]
+}
+
+Important:
+The LLM decides dynamic content, but Python will enforce mandatory slides.
+
+
+============================================================
+8. PHASE 5 - MANDATORY SLIDE ENGINE
+============================================================
+
+Create a fixed mandatory slide list.
+
+MANDATORY_SLIDES:
+
+1. technology
+2. cost
+3. reference_architecture
+4. landscape_architecture
+5. thank_you
+
+These slides must exist regardless of document type.
+
+The dynamic planner must NOT be allowed to remove them.
+
+Final presentation structure:
+
+    Dynamic document-specific slides
+                    +
+    Technology
+    Cost
+    Reference Architecture
+    Landscape Architecture
+    Thank You
+
+
+============================================================
+9. PHASE 6 - PRESENTATION IR
+============================================================
+
+The current project already has structured JSON IR.
+
+Refactor it from proposal-specific data to generic presentation data.
+
+Suggested structure:
+
+{
+  "metadata": {
+    "title": "...",
+    "document_type": "...",
+    "source_files": []
+  },
+
+  "dynamic_slides": [],
+
+  "mandatory_slides": {
+    "technology": {},
+    "cost": {},
+    "reference_architecture": {},
+    "landscape_architecture": {}
+  }
+}
+
+The Presentation IR becomes the contract between:
+
+    Agents/LLM
+          |
+          v
+    PPTX Renderer
+
+
+============================================================
+10. PHASE 7 - PPTX GENERATOR REFACTOR
+============================================================
+
+Current file:
+
+    utils/pptx_generator.py
+
+The current generator contains many proposal-specific slides and
+hardcoded assumptions.
+
+Do NOT delete everything.
+
+Reuse existing:
+- PPTX setup
+- Theme
+- Text rendering
+- Diagram rendering
+- Mermaid support
+- Existing architecture functions
+- Download/output handling
+
+Refactor the generator into:
+
+    generate_pptx()
+
+        1. Create title slide
+        2. Render dynamic slides
+        3. Render Technology
+        4. Render Cost
+        5. Render Reference Architecture
+        6. Render Landscape Architecture
+        7. Render Thank You
+
+
+============================================================
+11. PHASE 8 - SLIDE RENDERERS
+============================================================
+
+Create:
+
+    utils/slide_renderers/
+
+Suggested files:
+
+    executive_summary.py
+    workflow.py
+    data_flow.py
+    architecture.py
+    agent_architecture.py
+    security.py
+    metrics.py
+    technology.py
+    cost.py
+    reference_architecture.py
+    landscape_architecture.py
+    thank_you.py
+
+The renderer should be based on:
+
+    slide["type"]
+
+Example:
+
+    render_slide(slide)
+
+then route to the correct renderer.
+
+
+============================================================
+12. PHASE 9 - TECHNOLOGY SLIDE
+============================================================
+
+Technology slide is mandatory.
+
+Extract technologies from the uploaded document.
+
+Possible categories:
+
+- Programming Languages
+- Frontend
+- Backend
+- Frameworks
+- LLMs
+- AI/ML
+- RAG
+- Vector Database
+- Database
+- Cache
+- Orchestration
+- Integration
+- Security
+- Monitoring
+- Cloud
+- Infrastructure
+
+Important:
+
+Do NOT automatically add technologies simply because they are common.
+
+If technology is not specified:
+
+    "Not specified in source document"
+
+may be shown.
+
+For architecture recommendations generated by the system, clearly distinguish:
+
+    Document Specified
+    Recommended
+    Estimated
+
+
+============================================================
+13. PHASE 10 - COST SLIDE
+============================================================
+
+Cost slide is mandatory.
+
+Two modes:
+
+MODE A:
+The document contains cost information.
+
+Display:
+
+    Document-Specified Cost
+
+MODE B:
+The document does not contain cost information.
+
+Generate:
+
+    Estimated Cost
+
+based on:
+- Technology
+- Infrastructure
+- Cloud
+- Expected workload
+- Architecture
+- Deployment assumptions
+
+Clearly label estimated values.
+
+Do NOT invent a client budget.
+
+Do NOT use fake values such as:
+- $250,000
+- Acme Corporation
+- 14 weeks
+
+unless they are actually present in the document.
+
+Also remove Azure-specific assumptions from generic cost calculation.
+
+Use:
+
+    Cloud Provider: AWS / Azure / GCP / On-Prem / Not Specified
+
+
+============================================================
+14. PHASE 11 - REFERENCE ARCHITECTURE
+============================================================
+
+Reference Architecture is mandatory.
+
+Source:
+
+    Uploaded Document
+          |
+          v
+    Architecture Extraction
+          |
+          v
+    Architecture IR
+          |
+          v
+    Diagram Renderer
+
+The architecture should represent the logical system.
+
+Example:
+
+    Users / Events
+          |
+          v
+    API Gateway
+          |
+          v
+    Agent Orchestrator
+          |
+          +-------------------+
+          |                   |
+          v                   v
+       RAG Agent         Remediation Agent
+          |                   |
+          v                   v
+      Knowledge          Tool Layer
+          |
+          v
+       Memory / DB
+
+The exact components must come from the document.
+
+
+============================================================
+15. PHASE 12 - LANDSCAPE ARCHITECTURE
+============================================================
+
+Landscape Architecture is mandatory.
+
+It represents the deployment/infrastructure view.
+
+Cloud provider must be detected from the document.
+
+Rules:
+
+    AWS
+      -> AWS landscape
+
+    Azure
+      -> Azure landscape
+
+    GCP
+      -> GCP landscape
+
+    On-Prem
+      -> On-Prem landscape
+
+    Not specified
+      -> Generic logical deployment landscape
+
+Do NOT default to Azure when the document does not specify Azure.
+
+
+============================================================
+16. PHASE 13 - DESIGN AGENT REFACTOR
+============================================================
+
+Modify:
+
+    agents/design_agent.py
+
+Current design logic contains proposal-specific defaults.
+
+Remove/reduce hardcoded assumptions such as:
+
+- Generic proposal portal
+- Fixed proposal dashboard
+- Fixed proposal engine
+- Fixed proposal workflow
+
+New responsibility:
+
+    Document Content
+          |
+          v
+    Architecture Interpretation
+          |
+          v
+    Solution/Design Representation
+          |
+          v
+    Diagram Specification
+          |
+          v
+    Presentation IR
+
+
+============================================================
+17. PHASE 14 - PROMPT REFACTOR
+============================================================
+
+Modify:
+
+    utils/prompts.py
+
+Replace RFP-only wording such as:
+
+    "RFP"
+    "client proposal"
+    "pre-sales"
+    "bid manager"
+
+with generic terminology where appropriate.
+
+New core prompt concept:
+
+"You are a technical document analysis assistant.
+
+Analyze the uploaded document regardless of whether it is:
+- Architecture Specification
+- HLA
+- LLD
+- Technical Design
+- RFP
+- Project Proposal
+- Case Study
+- Product Specification
+- Requirements Document
+
+Extract only information supported by the source document.
+Do not invent unsupported facts."
+
+
+============================================================
+18. PHASE 15 - REMOVE PROPOSAL-SPECIFIC DEFAULT SLIDES
+============================================================
+
+The following should NOT be mandatory for every document:
+
+- Client Requirements & Gap Analysis
+- Capability Gaps
+- Project Milestones
+- Effort & Person-Hour
+- Skills Mapping
+- Case Study
+
+They should only appear when the source document contains relevant
+information.
+
+Example:
+
+If the document contains a roadmap:
+
+    Add Implementation Roadmap
+
+If not:
+
+    Do not add it.
+
+
+============================================================
+19. PHASE 16 - REMOVE FAKE FALLBACK DATA
+============================================================
+
+Current proposal-oriented fallback values must be removed.
+
+Examples:
+
+    Acme Corporation
+    $250,000
+    14 Weeks
+
+These should never appear unless supported by the uploaded document.
+
+If information is missing:
+
+    "Not specified in source document"
+
+For cost:
+
+    "Estimated - based on stated assumptions"
+
+
+============================================================
+20. PHASE 17 - SOURCE GROUNDING
+============================================================
+
+Every important extracted item should ideally maintain source context.
+
+Example:
+
+{
+  "name": "LangGraph",
+  "source": "Frameworks & Tooling section"
+}
+
+This can later be used for:
+
+- Hallucination detection
+- Audit
+- Validation
+- Explainability
+
+The presentation should be based on source-grounded information.
+
+
+============================================================
+21. PHASE 18 - PRESENTATION VALIDATOR
+============================================================
+
+Create:
+
+    utils/presentation_validator.py
+
+Validation checks:
+
+MANDATORY:
+    [ ] Technology slide exists
+    [ ] Cost slide exists
+    [ ] Reference Architecture exists
+    [ ] Landscape Architecture exists
+    [ ] Thank You exists
+
+CONTENT:
+    [ ] No empty slides
+    [ ] No duplicate slide titles
+    [ ] No invented client name
+    [ ] No invented budget
+    [ ] No unsupported technology
+    [ ] Architecture data exists
+    [ ] Mermaid/diagram syntax is valid
+    [ ] Slide count is reasonable
+
+
+============================================================
+22. PHASE 19 - ORCHESTRATOR REFACTOR
+============================================================
+
+Modify:
+
+    agents/orchestrator.py
+
+New conceptual flow:
+
+    1. Ingest Document
+    2. Understand Document
+    3. Analyze Content
+    4. Plan Presentation
+    5. Build Presentation IR
+    6. Validate IR
+    7. Generate PPTX
+    8. Validate PPTX
+    9. Complete
+
+Existing pause/resume/cancel functionality should be preserved.
+
+
+============================================================
+23. PHASE 20 - DATABASE CHANGES
+============================================================
+
+Keep the existing "proposals" table initially for backward compatibility.
+
+Add fields such as:
+
+    document_type
+    document_title
+    document_analysis
+    presentation_plan
+
+Existing fields such as:
+
+    files_info
+    structured_json_ir
+    requirements_text
+    additional_context
+
+can continue to be reused.
+
+Do NOT rename the database table in the first implementation.
+
+A future migration can rename:
+
+    proposals -> presentations
+
+
+============================================================
+24. PHASE 21 - API CHANGES
+============================================================
+
+First implementation:
+
+Reuse the existing upload endpoint to reduce frontend changes.
+
+Current concept:
+
+    POST /api/proposals/upload
+
+can continue initially.
+
+Later, if required:
+
+    POST /api/presentations/upload
+
+The frontend should continue to support:
+
+- Upload
+- Processing status
+- Pause
+- Resume
+- Cancel
+- Download PPT
+
+
+============================================================
+25. PHASE 22 - TESTING
+============================================================
+
+Test with multiple document types.
+
+TEST 1:
+Agent 2 / Intelligent Incident Service Desk architecture document.
+
+Expected dynamic content:
+- Executive Summary
+- Functional Flow
+- Multi-Agent Architecture
+- Agent Roles
+- RAG
+- LLM Strategy
+- Data & Integration
+- Security
+- Success Metrics
+
+Mandatory:
+- Technology
+- Cost
+- Reference Architecture
+- Landscape Architecture
+- Thank You
+
+
+TEST 2:
+Cloud Migration Architecture.
+
+Expected:
+- Current State
+- Target State
+- Migration Strategy
+- Data Migration
+- Security
+- Risks
+- Technology
+- Cost
+- Reference Architecture
+- Landscape Architecture
+- Thank You
+
+
+TEST 3:
+AI Chatbot Technical Design.
+
+Expected:
+- Business Objective
+- Conversation Flow
+- AI Architecture
+- LLM
+- RAG
+- Data Flow
+- Security
+- Evaluation
+- Technology
+- Cost
+- Reference Architecture
+- Landscape Architecture
+- Thank You
+
+
+TEST 4:
+Existing RFP.
+
+Expected:
+Existing proposal-generation behavior should remain functional as much
+as possible.
+
+
+TEST 5:
+Document with limited technical information.
+
+Expected:
+Mandatory slides still exist, but unsupported information must be shown
+as:
+
+    "Not specified in source document"
+
+No fabricated data.
+
+
+============================================================
+26. PHASE 23 - REGRESSION TESTING
+============================================================
+
+Verify that existing features continue to work:
+
+    [ ] Upload
+    [ ] Document extraction
+    [ ] Queue
+    [ ] Pause
+    [ ] Resume
+    [ ] Cancel
+    [ ] PPT generation
+    [ ] PPT download
+    [ ] Slide refinement
+    [ ] RBAC
+    [ ] Knowledge Base
+    [ ] RAG
+    [ ] Existing RFP workflow
+
+
+============================================================
+27. RECOMMENDED FINAL ARCHITECTURE
+============================================================
+
+                    DOCUMENT
+                       |
+                       v
+             +----------------------+
+             | Document Extraction  |
+             +----------+-----------+
+                        |
+                        v
+             +----------------------+
+             | Document             |
+             | Understanding Agent  |
+             +----------+-----------+
+                        |
+                        v
+             +----------------------+
+             | Content Analysis     |
+             | Agent                |
+             +----------+-----------+
+                        |
+                        v
+             +----------------------+
+             | Presentation Planner |
+             +----------+-----------+
+                        |
+              +---------+---------+
+              |                   |
+              v                   v
+      Dynamic Slides       Mandatory Slides
+              |                   |
+              |              Technology
+              |              Cost
+              |              Reference Architecture
+              |              Landscape Architecture
+              |              Thank You
+              |                   |
+              +---------+---------+
+                        |
+                        v
+             +----------------------+
+             | Presentation IR      |
+             +----------+-----------+
+                        |
+                        v
+             +----------------------+
+             | PPTX Renderer        |
+             +----------+-----------+
+                        |
+                        v
+                       PPT
+
+
+============================================================
+28. RECOMMENDED FILE STRUCTURE
+============================================================
+
+agents/
+    orchestrator.py
+    intake_agent.py
+    requirement_agent.py
+    design_agent.py
+    document_understanding_agent.py
+
+utils/
+    pptx_generator.py
+    dynamic_pptx_agent.py
+    prompts.py
+    presentation_planner.py
+    presentation_schema.py
+    presentation_validator.py
+
+    slide_renderers/
+        executive_summary.py
+        workflow.py
+        data_flow.py
+        architecture.py
+        agent_architecture.py
+        security.py
+        metrics.py
+        technology.py
+        cost.py
+        reference_architecture.py
+        landscape_architecture.py
+        thank_you.py
+
+controllers/
+    proposal_controller.py
+
+database/
+    schema.sql
+
+
+============================================================
+29. IMPLEMENTATION PRIORITY
+============================================================
+
+Priority 1 - MUST HAVE
+
+1. Generic Document Understanding Agent
+2. Generic Content Analysis
+3. Document Type Detection
+4. Presentation Planner
+5. Presentation IR
+6. Mandatory Slide Engine
+7. Dynamic PPT Renderer
+
+
+Priority 2 - MUST HAVE
+
+8. Technology Slide
+9. Cost Slide
+10. Reference Architecture
+11. Landscape Architecture
+12. Thank You
+13. Architecture extraction
+14. Cloud provider detection
+
+
+Priority 3 - IMPORTANT
+
+15. Remove RFP hardcoding
+16. Remove fake fallback data
+17. Generic prompts
+18. Presentation validation
+19. Source grounding
+
+
+Priority 4 - CLEANUP
+
+20. Refactor large PPTX generator
+21. Separate slide renderers
+22. Improve database naming
+23. Add generic presentation endpoint
+24. Improve frontend terminology
+
+
+============================================================
+30. IMPORTANT IMPLEMENTATION RULES
+============================================================
+
+RULE 1:
+The uploaded document is the primary source of truth.
+
+RULE 2:
+Dynamic slides are determined by the document.
+
+RULE 3:
+These slides are always present:
+
+    Technology
+    Cost
+    Reference Architecture
+    Landscape Architecture
+    Thank You
+
+RULE 4:
+Do not invent client names, budgets, timelines, technologies or
+architecture components.
+
+RULE 5:
+If information is missing, explicitly say:
+
+    "Not specified in source document"
+
+RULE 6:
+If a value is estimated, label it:
+
+    "Estimated"
+
+RULE 7:
+Do not assume Azure, AWS or GCP unless supported by the document.
+
+RULE 8:
+LLM decides content; Python enforces presentation structure.
+
+RULE 9:
+Existing upload, workflow, download, pause/resume/cancel and RFP
+functionality should be preserved during refactoring.
+
+RULE 10:
+The final PPT must be generated from a structured Presentation IR,
+not directly from an unstructured LLM response.
+
+
+============================================================
+31. FINAL EXPECTED BEHAVIOR
+============================================================
+
+For ANY uploaded document:
+
+    Upload
+      |
+      v
+    Understand
+      |
+      v
+    Extract facts
+      |
+      v
+    Identify document type
+      |
+      v
+    Decide relevant slides
+      |
+      v
+    Add mandatory slides
+      |
+      v
+    Validate
+      |
+      v
+    Generate PPT
+
+
+Example for Agent 2 document:
+
+    1. Title
+    2. Executive Summary
+    3. Functional Flow
+    4. Multi-Agent Architecture
+    5. Agent Roles & Responsibilities
+    6. Autonomy & Human-in-the-Loop
+    7. RAG & Knowledge
+    8. LLM Strategy
+    9. Data & Integrations
+    10. Security & Governance
+    11. Success Metrics
+    12. Technology Stack
+    13. Cost Estimate
+    14. Reference Architecture
+    15. Landscape Architecture
+    16. Thank You
+
+
+For another document, the dynamic slides may be completely different.
+
+The mandatory slides remain consistent.
+
+============================================================
+32. FINAL DEVELOPMENT SEQUENCE
+============================================================
+
+STEP 1
+Backup current project.
+
+STEP 2
+Create Document Understanding Agent.
+
+STEP 3
+Refactor Requirement Agent for generic content extraction.
+
+STEP 4
+Refactor prompts.
+
+STEP 5
+Create Presentation Planner.
+
+STEP 6
+Create generic Presentation IR schema.
+
+STEP 7
+Refactor Design Agent.
+
+STEP 8
+Create dynamic slide renderers.
+
+STEP 9
+Refactor PPTX Generator.
+
+STEP 10
+Implement mandatory Technology slide.
+
+STEP 11
+Implement mandatory Cost slide.
+
+STEP 12
+Implement Reference Architecture.
+
+STEP 13
+Implement Landscape Architecture.
+
+STEP 14
+Implement mandatory Thank You slide.
+
+STEP 15
+Add Presentation Validator.
+
+STEP 16
+Refactor Orchestrator.
+
+STEP 17
+Remove hardcoded proposal/fake fallback data.
+
+STEP 18
+Run multi-document testing.
+
+STEP 19
+Run existing RFP regression tests.
+
+STEP 20
+Production cleanup and deployment.
+
+
+============================================================
+END OF IMPLEMENTATION PLAN
+============================================================
