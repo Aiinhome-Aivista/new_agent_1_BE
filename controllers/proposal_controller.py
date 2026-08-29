@@ -83,6 +83,7 @@ def upload_proposal():
         budget = request.form.get("budget")
         requirements_text = request.form.get("requirements_text")
         additional_context = request.form.get("additional_context")
+        template_type = request.form.get("template_type", "default")
         
         if not client_name or client_name.strip() == "":
             client_name = "Extracting Client Name..."
@@ -184,8 +185,8 @@ def upload_proposal():
         status = "Queued" if active_count > 0 else "Ingesting"
  
         cursor.execute(
-            "INSERT INTO proposals (id, client_name, project_duration, budget, status, files_info, requirements_text, case_study_files, ppt_template_file, additional_context) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (proposal_id, client_name, project_duration, budget, status, json.dumps(uploaded_files), requirements_text, json.dumps(uploaded_case_study_files), ppt_template_path, additional_context)
+            "INSERT INTO proposals (id, client_name, project_duration, budget, status, files_info, requirements_text, case_study_files, ppt_template_file, additional_context, template_type) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (proposal_id, client_name, project_duration, budget, status, json.dumps(uploaded_files), requirements_text, json.dumps(uploaded_case_study_files), ppt_template_path, additional_context, template_type)
         )
         conn.commit()
         cursor.close()
@@ -201,7 +202,8 @@ def upload_proposal():
                 files_info=uploaded_files,
                 requirements_text=requirements_text,
                 case_study_files=uploaded_case_study_files,
-                ppt_template_path=ppt_template_path
+                ppt_template_path=ppt_template_path,
+                template_type=template_type
             )
             msg = "Proposal generation job triggered successfully"
         else:
@@ -340,7 +342,7 @@ def trigger_next_job_async(proposal_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
-        cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_file, template_type FROM proposals WHERE id = %s", (proposal_id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -360,6 +362,7 @@ def trigger_next_job_async(proposal_id):
             case_study_files = json.loads(c_info) if c_info else []
             
             p_temp = row.get('ppt_template_file') if isinstance(row, dict) else row[6]
+            template_type = row.get('template_type') if isinstance(row, dict) else row[7]
             
             trigger_proposal_job(
                 proposal_id=proposal_id,
@@ -369,7 +372,8 @@ def trigger_next_job_async(proposal_id):
                 files_info=files_info,
                 requirements_text=r_text,
                 case_study_files=case_study_files,
-                ppt_template_path=p_temp
+                ppt_template_path=p_temp,
+                template_type=template_type
             )
     except Exception as e:
         print('Error in trigger_next_job_async:', e)
@@ -398,11 +402,12 @@ def resume_proposal_job(proposal_id):
         # Assuming we need to import run_orchestration here or it's already imported
         # Wait, trigger_proposal_job triggers the thread, we should use a similar trigger_resume_job
         from agents.orchestrator import trigger_resume_job
-        # Get ppt_template_file from DB
+        # Get ppt_template_file and template_type from DB
         cursor = conn.cursor()
-        cursor.execute("SELECT ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        cursor.execute("SELECT ppt_template_file, template_type FROM proposals WHERE id = %s", (proposal_id,))
         pt_row = cursor.fetchone()
         ppt_template_path = pt_row[0] if pt_row else None
+        template_type = pt_row[1] if pt_row else "default"
         cursor.close()
 
         # Pause any active proposals
@@ -413,7 +418,7 @@ def resume_proposal_job(proposal_id):
         cursor.close()
         conn.close()
 
-        trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path)
+        trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path, template_type)
         
         return success_response({"message": "Job resumed successfully.", "proposal_id": proposal_id})
     except Exception as e:

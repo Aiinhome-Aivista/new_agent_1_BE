@@ -113,6 +113,7 @@ def init_sqlite_db():
         draft_ir TEXT NULL,
         additional_context TEXT NULL,
         ppt_template_file TEXT NULL,
+        template_type TEXT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
     """)
@@ -129,6 +130,8 @@ def init_sqlite_db():
     try: cursor.execute("ALTER TABLE proposals ADD COLUMN additional_context TEXT NULL")
     except: pass
     try: cursor.execute("ALTER TABLE proposals ADD COLUMN ppt_template_file TEXT NULL")
+    except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN template_type TEXT NULL")
     except: pass
     try: cursor.execute("ALTER TABLE proposals ADD COLUMN submitted_by_role TEXT NULL")
     except: pass
@@ -251,6 +254,10 @@ def init_db():
             try: cursor.execute("ALTER TABLE proposals ADD COLUMN ppt_template_file VARCHAR(500) NULL")
             except mysql.connector.Error as err:
                 if err.errno != 1060: print(f"Migration error (ppt_template_file): {err}")
+                    
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN template_type VARCHAR(100) NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (template_type): {err}")
                     
             conn.commit()
             print("MySQL database initialized successfully.")

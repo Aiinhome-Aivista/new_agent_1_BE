@@ -216,7 +216,7 @@ def safe_json_loads(json_str, fallback):
         print(f"Failed to parse JSON: {e}. Raw content: {json_str}")
         return fallback
 
-def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None, resume=False):
+def run_orchestration(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None, template_type="default", resume=False):
     """The full Multi-Agent pipeline, executing step-by-step using LLM and fallback defaults."""
     full_case_study_text = ""
     completed_steps = set()
@@ -541,6 +541,7 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
             "case_study_text": full_case_study_text,
             "structured_case_studies": structured_case_studies,
             "ppt_template_path": ppt_template_path,
+            "template_type": template_type,
             "full_document_text": full_document_text[:10000]
         }
         update_proposal_status(proposal_id, "WaitingForTechSelection", json_ir=json.dumps(partial_state))
@@ -591,6 +592,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         case_study_text = partial_state.get("case_study_text", "")
         structured_case_studies = partial_state.get("structured_case_studies", [])
         ppt_template_path = partial_state.get("ppt_template_path", None)
+        template_type = partial_state.get("template_type", "default")
         
         full_document_text = partial_state.get("full_document_text", "")
         if not full_document_text and files_info:
@@ -803,7 +805,8 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "timeline_phases": timeline_phases,
             "resources": resources,
             "skills_mapping": skills_mapping,
-            "complex_diagrams": design_data.get("complex_diagrams", [])
+            "complex_diagrams": design_data.get("complex_diagrams", []),
+            "template_type": template_type
         }
         update_proposal_status(proposal_id, "WaitingForRateConfirmation", json_ir=json.dumps(draft_ir))
         return
@@ -843,6 +846,7 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
             
         ppt_template_path = row.get("ppt_template_file")
         draft_ir = json.loads(row["structured_json_ir"])
+        template_type = draft_ir.get("template_type", "default")
         draft_ir["resources"] = updated_resources
         
         client_name = draft_ir.get("client_name", "Client")
@@ -922,7 +926,12 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
         file_name = f"{safe_client_name}_Proposal.pptx"
         file_path = os.path.join(out_dir, file_name)
         
-        generate_pptx(final_ir_data, file_path, template_path=ppt_template_path)
+        # Determine generator function based on template type
+        if template_type != "default":
+            from utils.custom_pptx_generator import generate_custom_pptx
+            generate_custom_pptx(final_ir_data, file_path, template_path=ppt_template_path, template_type=template_type)
+        else:
+            generate_pptx(final_ir_data, file_path, template_path=ppt_template_path)
         
         relative_path = f"/static/proposals/{file_name}"
         
@@ -942,10 +951,10 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
                 update_step_status(proposal_id, step, "failed", f"Failed due to error: {str(e)}\n{tb}")
 
 
-def trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None):
+def trigger_resume_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None, template_type="default"):
     thread = __import__('threading').Thread(
         target=run_orchestration,
-        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path, True)
+        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path, template_type, True)
     )
     thread.daemon = True
     thread.start()
@@ -981,7 +990,7 @@ def trigger_next_job_async(proposal_id):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True) if hasattr(conn.cursor, 'dictionary') else conn.cursor()
-        cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        cursor.execute("SELECT client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_file, template_type FROM proposals WHERE id = %s", (proposal_id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -1001,6 +1010,7 @@ def trigger_next_job_async(proposal_id):
             case_study_files = json.loads(c_info) if c_info else []
             
             p_temp = row.get('ppt_template_file') if isinstance(row, dict) else row[6]
+            template_type = row.get('template_type') if isinstance(row, dict) else row[7]
             
             trigger_proposal_job(
                 proposal_id=proposal_id,
@@ -1010,17 +1020,18 @@ def trigger_next_job_async(proposal_id):
                 files_info=files_info,
                 requirements_text=r_text,
                 case_study_files=case_study_files,
-                ppt_template_path=p_temp
+                ppt_template_path=p_temp,
+                template_type=template_type
             )
     except Exception as e:
         print('Error in trigger_next_job_async:', e)
 
 
-def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None):
+def trigger_proposal_job(proposal_id, client_name, project_duration, budget, files_info, requirements_text=None, case_study_files=None, ppt_template_path=None, template_type="default"):
     """Triggers the orchestrator thread asynchronously so UI remains non-blocking."""
     thread = threading.Thread(
         target=run_orchestration,
-        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path)
+        args=(proposal_id, client_name, project_duration, budget, files_info, requirements_text, case_study_files, ppt_template_path, template_type)
     )
     thread.daemon = True
     thread.start()
