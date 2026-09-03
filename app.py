@@ -81,6 +81,10 @@ def login():
 def upload_proposal():
     return proposal_controller.upload_proposal()
 
+@app.route('/api/proposals/upload-s3-only', methods=['POST'])
+def upload_s3_only():
+    return proposal_controller.upload_s3_only()
+
 @app.route('/api/upload-hla', methods=['POST'])
 @require_role('presales', 'bidmanager', 'admin')
 def upload_hla():

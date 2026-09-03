@@ -932,7 +932,7 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
             generate_custom_pptx(final_ir_data, file_path, template_path=ppt_template_path, template_type=template_type)
         else:
             generate_pptx(final_ir_data, file_path, template_path=ppt_template_path)
-        
+            
         relative_path = f"/static/proposals/{file_name}"
         
         logs = f"PowerPoint file compiled: {file_name}. Presentation layout successfully validated."

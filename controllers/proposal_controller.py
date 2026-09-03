@@ -76,6 +76,35 @@ Generate the next question to ask the user.
         print(f"Error generating question: {e}")
         return jsonify({"success": False, "data": {"question": "Could you elaborate on the technical constraints for this project?"}}), 500
 
+def upload_s3_only():
+    try:
+        from flask import request
+        from utils.s3_utils import upload_to_s3
+        files = request.files.getlist("files")
+        
+        bucket_name = os.getenv("AWS_S3_BUCKET_NAME", "agent-initiative-bucket")
+        base_folder = os.getenv("AWS_S3_BASE_FOLDER", "Agent_doc")
+        agent_folder = os.getenv("AWS_S3_AGENT_FOLDER", "Agent_11")
+        
+        uploaded_keys = []
+        for file in files:
+            if file.filename:
+                extracted_name = os.path.splitext(file.filename)[0]
+                s3_base_path = f"{base_folder}/{agent_folder}/{extracted_name}"
+                input_key = f"{s3_base_path}/input/{file.filename}"
+                
+                success, msg = upload_to_s3(file.stream, bucket_name, input_key)
+                if success:
+                    uploaded_keys.append(input_key)
+                    print(f"[AWS S3 Fast] Successfully saved '{file.filename}' to S3.", flush=True)
+                else:
+                    print(f"[AWS S3 Fast] Failed to upload '{file.filename}': {msg}", flush=True)
+                    
+        return success_response({"message": "Uploaded to S3", "keys": uploaded_keys})
+    except Exception as e:
+        print(f"Error in upload_s3_only: {e}")
+        return error_response(f"S3 upload failed: {str(e)}", status_code=500)
+
 def upload_proposal():
     try:
         client_name = request.form.get("client_name")
@@ -105,6 +134,26 @@ def upload_proposal():
                 safe_name = f"{uuid.uuid4()}_{file.filename}"
                 save_path = os.path.join(upload_dir, safe_name)
                 file.save(save_path)
+                
+                # Upload to S3 immediately before questions
+                from utils.s3_utils import upload_to_s3
+                bucket_name = os.getenv("AWS_S3_BUCKET_NAME", "agent-initiative-bucket")
+                base_folder = os.getenv("AWS_S3_BASE_FOLDER", "Agent_doc")
+                agent_folder = os.getenv("AWS_S3_AGENT_FOLDER", "Agent_11")
+                
+                extracted_name = os.path.splitext(file.filename)[0]
+                s3_base_path = f"{base_folder}/{agent_folder}/{extracted_name}"
+                input_key = f"{s3_base_path}/input/{file.filename}"
+                
+                try:
+                    with open(save_path, 'rb') as f:
+                        success, msg = upload_to_s3(f, bucket_name, input_key)
+                        if success:
+                            print(f"[AWS S3] Successfully saved '{file.filename}' to S3 before questions.", flush=True)
+                        else:
+                            print(f"[AWS S3] Failed to upload '{file.filename}': {msg}", flush=True)
+                except Exception as e:
+                    print(f"[AWS S3] Exception during upload: {e}", flush=True)
                 
                 # Extract text for validation
                 from utils.doc_extractor import extract_text
@@ -507,7 +556,7 @@ def transition_proposal_status(proposal_id):
             
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT status FROM proposals WHERE id = %s", (proposal_id,))
+        cursor.execute("SELECT status, generated_file_path, client_name, files_info FROM proposals WHERE id = %s", (proposal_id,))
         prop = cursor.fetchone()
         
         if not prop:
@@ -563,6 +612,42 @@ def transition_proposal_status(proposal_id):
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Upload PPT to S3 'output' folder if Approved
+        if new_status == "Approved":
+            generated_file = prop.get("generated_file_path")
+            if generated_file:
+                filename = os.path.basename(generated_file)
+                local_path = os.path.join(os.getcwd(), 'static', 'proposals', filename)
+                if os.path.exists(local_path):
+                    from utils.s3_utils import upload_to_s3
+                    bucket_name = os.getenv("AWS_S3_BUCKET_NAME", "agent-initiative-bucket")
+                    base_folder = os.getenv("AWS_S3_BASE_FOLDER", "Agent_doc")
+                    agent_folder = os.getenv("AWS_S3_AGENT_FOLDER", "Agent_11")
+                    
+                    extracted_name = prop.get("client_name") or proposal_id
+                    files_info_str = prop.get("files_info")
+                    if files_info_str:
+                        try:
+                            files_info = json.loads(files_info_str)
+                            if files_info and len(files_info) > 0:
+                                original_name = files_info[0].get("original_name")
+                                if original_name:
+                                    extracted_name = os.path.splitext(original_name)[0]
+                        except Exception:
+                            pass
+                            
+                    output_key = f"{base_folder}/{agent_folder}/{extracted_name}/output/{filename}"
+                    try:
+                        print(f"[AWS S3] Uploading approved PPT to S3: {output_key}")
+                        with open(local_path, "rb") as f:
+                            success, msg = upload_to_s3(f, bucket_name, output_key)
+                        if success:
+                            print(f"[AWS S3] Successfully uploaded approved PPT to S3.")
+                        else:
+                            print(f"[AWS S3] Failed to upload approved PPT: {msg}")
+                    except Exception as e:
+                        print(f"[AWS S3] Error uploading approved PPT: {e}")
         
         # Trigger next in queue if available
         process_next_in_queue()
