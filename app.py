@@ -18,6 +18,12 @@ app = Flask(__name__)
 # Enable CORS for React dev server (usually localhost:5173)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
+@app.before_request
+def log_request_info():
+    print(f"==================================================")
+    print(f"[API HIT] {request.method} {request.path}")
+    print(f"==================================================")
+
 # -------------------------------------------------------
 # ROLE-BASED ACCESS CONTROL (RBAC) MIDDLEWARE
 # -------------------------------------------------------
