@@ -1152,7 +1152,8 @@ def generate_custom_pptx(data, output_path, template_path=None, template_type="d
     # SLIDE 6: Effort & Person-Hour Conversion
     # ----------------------------------------------------
     slide = prs.slides.add_slide(blank_slide_layout)
-    create_slide_header(slide, "Effort & Person-Hour Conversion", "Allocated program FTE structure, rate cards, and financial sizing")
+    re_title, re_subtitle = get_dynamic_header(data, "resources_effort", "Effort & Person-Hour Conversion", "Allocated program FTE structure, rate cards, and financial sizing")
+    create_slide_header(slide, re_title, re_subtitle)
     add_footer(slide)
 
     # Table layout
