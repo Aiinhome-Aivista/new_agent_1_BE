@@ -75,6 +75,11 @@ def login():
 def upload_proposal():
     return proposal_controller.upload_proposal()
 
+@app.route('/api/upload-hla', methods=['POST'])
+@require_role('presales', 'bidmanager', 'admin')
+def upload_hla():
+    return proposal_controller.upload_hla()
+
 @app.route('/api/case-studies/upload', methods=['POST'])
 @require_role('presales', 'admin')
 def upload_case_study():

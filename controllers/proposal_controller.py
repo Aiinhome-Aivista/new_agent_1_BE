@@ -1122,3 +1122,61 @@ Ensure the returned JSON is valid and complete.
     except Exception as e:
         return error_response(f"Slide refinement failed: {str(e)}", status_code=500)
 
+
+def upload_hla():
+    """
+    Endpoint to upload HLA document and output PPT to S3.
+    """
+    from flask import request
+    from utils.s3_utils import upload_to_s3
+    import uuid
+
+    try:
+        # Get extracted_name from form data
+        extracted_name = request.form.get("extracted_name")
+        
+        input_doc = request.files.get("input_doc")
+        output_ppt = request.files.get("output_ppt")
+        
+        if not input_doc:
+            return error_response("Missing 'input_doc' file in the request.", status_code=400)
+            
+        if not extracted_name:
+            # Fallback to filename without extension
+            extracted_name = os.path.splitext(input_doc.filename)[0]
+            
+        # Get S3 configuration from environment variables
+        bucket_name = os.getenv("AWS_S3_BUCKET_NAME", "agent-initiative-bucket")
+        base_folder = os.getenv("AWS_S3_BASE_FOLDER", "Agent_doc")
+        agent_folder = os.getenv("AWS_S3_AGENT_FOLDER", "Agent_11")
+        
+        # Base S3 path
+        s3_base_path = f"{base_folder}/{agent_folder}/{extracted_name}"
+        
+        results = {}
+        
+        # Upload input doc
+        input_key = f"{s3_base_path}/input/{input_doc.filename}"
+        print(f"[AWS S3] Uploading input document '{input_doc.filename}' to S3...", flush=True)
+        success, msg = upload_to_s3(input_doc.stream, bucket_name, input_key)
+        if success:
+            print(f"[AWS S3] Successfully saved '{input_doc.filename}' to S3.", flush=True)
+        results["input_doc"] = {"success": success, "message": msg, "s3_key": input_key if success else None}
+        
+        # Upload output ppt if provided
+        if output_ppt:
+            output_key = f"{s3_base_path}/output/{output_ppt.filename}"
+            print(f"[AWS S3] Uploading output PPT '{output_ppt.filename}' to S3...", flush=True)
+            success_ppt, msg_ppt = upload_to_s3(output_ppt.stream, bucket_name, output_key)
+            if success_ppt:
+                print(f"[AWS S3] Successfully saved '{output_ppt.filename}' to S3.", flush=True)
+            results["output_ppt"] = {"success": success_ppt, "message": msg_ppt, "s3_key": output_key if success_ppt else None}
+            
+        return success_response({
+            "message": "Upload process completed",
+            "extracted_name": extracted_name,
+            "results": results
+        })
+        
+    except Exception as e:
+        return error_response(f"Failed to process HLA upload: {str(e)}", status_code=500)
