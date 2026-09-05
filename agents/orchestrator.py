@@ -836,7 +836,7 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT structured_json_ir, ppt_template_file FROM proposals WHERE id = %s", (proposal_id,))
+        cursor.execute("SELECT structured_json_ir, ppt_template_file, files_info FROM proposals WHERE id = %s", (proposal_id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -845,6 +845,7 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
             raise ValueError("No intermediate state found to resume phase 3.")
             
         ppt_template_path = row.get("ppt_template_file")
+        files_info_str = row.get("files_info")
         draft_ir = json.loads(row["structured_json_ir"])
         template_type = draft_ir.get("template_type", "default")
         draft_ir["resources"] = updated_resources
@@ -923,7 +924,19 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
         if not safe_client_name:
             safe_client_name = "Project"
             
-        file_name = f"{safe_client_name}_Proposal.pptx"
+        base_name = f"{safe_client_name}_Proposal"
+        if files_info_str:
+            try:
+                files_info = json.loads(files_info_str)
+                if files_info and len(files_info) > 0:
+                    orig_name = files_info[0].get("original_name")
+                    if orig_name:
+                        base_name = os.path.splitext(orig_name)[0]
+                        base_name = re.sub(r'[^a-zA-Z0-9_ -]', '', base_name).strip()
+            except Exception:
+                pass
+
+        file_name = f"{base_name}.pptx"
         file_path = os.path.join(out_dir, file_name)
         
         # Determine generator function based on template type

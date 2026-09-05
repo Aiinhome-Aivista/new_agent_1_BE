@@ -480,9 +480,32 @@ def edit_proposal_ir(proposal_id):
         if not new_ir_data:
             return error_response("JSON body data is required", status_code=400)
             
+        # Fetch files_info to get original filename
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT files_info FROM proposals WHERE id = %s", (proposal_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        base_name = f"proposal_{proposal_id}"
+        if row and row.get("files_info"):
+            try:
+                import json
+                import os
+                import re
+                files_info = json.loads(row["files_info"])
+                if files_info and len(files_info) > 0:
+                    orig_name = files_info[0].get("original_name")
+                    if orig_name:
+                        base_name = os.path.splitext(orig_name)[0]
+                        base_name = re.sub(r'[^a-zA-Z0-9_ -]', '', base_name).strip()
+            except Exception:
+                pass
+                
         # Regenerate pptx file
         out_dir = os.path.join(os.getcwd(), 'static', 'proposals')
-        file_name = f"proposal_{proposal_id}.pptx"
+        file_name = f"{base_name}.pptx"
         file_path = os.path.join(out_dir, file_name)
         
         # Render the updated PPTX
