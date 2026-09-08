@@ -58,23 +58,13 @@ class SQLiteConnectionWrapper:
         self.conn.close()
 
 def get_db_connection():
-    global USE_SQLITE
-    if USE_SQLITE:
-        return get_sqlite_connection()
-
-    try:
-        # Try MySQL
-        return mysql.connector.connect(
-            host=os.getenv("MYSQL_HOST", "localhost"),
-            port=int(os.getenv("MYSQL_PORT", 3306)),
-            user=os.getenv("MYSQL_USER", "root"),
-            password=os.getenv("MYSQL_PASSWORD", "1234"),
-            database=os.getenv("MYSQL_NAME", "mydb")
-        )
-    except Exception as e:
-        print(f"MySQL connection failed: {e}. Falling back to local SQLite database.")
-        USE_SQLITE = True
-        return get_sqlite_connection()
+    from services.db import get_db_provider
+    provider = get_db_provider()
+    pool = provider.init_pool()
+    if pool:
+        return pool.get_connection()
+    else:
+        raise Exception("Database pool initialization failed. SQLite fallback is disabled by configuration.")
 
 def get_sqlite_connection():
     db_path = os.path.join(os.path.dirname(__file__), 'database.db')
