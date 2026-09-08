@@ -532,10 +532,11 @@ def edit_proposal_ir(proposal_id):
         return error_response(f"Failed to edit and update proposal: {str(e)}", status_code=500)
 
 def download_proposal_pptx(proposal_id):
+    import json
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT generated_file_path FROM proposals WHERE id = %s", (proposal_id,))
+        cursor.execute("SELECT generated_file_path, client_name, files_info FROM proposals WHERE id = %s", (proposal_id,))
         row = cursor.fetchone()
         cursor.close()
         conn.close()
@@ -546,6 +547,45 @@ def download_proposal_pptx(proposal_id):
         relative_path = row["generated_file_path"]
         # Convert relative URL /static/proposals/... to local absolute filepath
         filename = os.path.basename(relative_path)
+        
+        # Attempt to get presigned URL from S3 first
+        from utils.s3_utils import get_s3_client
+        s3_client = get_s3_client()
+        if s3_client:
+            bucket_name = os.getenv("AWS_S3_BUCKET_NAME", "agent-initiative-bucket")
+            base_folder = os.getenv("AWS_S3_BASE_FOLDER", "Agent_doc")
+            agent_folder = os.getenv("AWS_S3_AGENT_FOLDER", "Agent_11")
+            
+            extracted_name = row.get("client_name") or proposal_id
+            files_info_str = row.get("files_info")
+            if files_info_str:
+                try:
+                    files_info = json.loads(files_info_str)
+                    if files_info and len(files_info) > 0:
+                        original_name = files_info[0].get("original_name")
+                        if original_name:
+                            extracted_name = os.path.splitext(original_name)[0]
+                except Exception:
+                    pass
+                    
+            output_key = f"{base_folder}/{agent_folder}/{extracted_name}/output/{filename}"
+            
+            try:
+                from flask import redirect
+                presigned_url = s3_client.generate_presigned_url(
+                    'get_object',
+                    Params={
+                        'Bucket': bucket_name,
+                        'Key': output_key,
+                        'ResponseContentDisposition': f'attachment; filename="{filename}"'
+                    },
+                    ExpiresIn=3600
+                )
+                return redirect(presigned_url)
+            except Exception as e:
+                print(f"[AWS S3] Error generating presigned URL for download: {e}")
+                
+        # Fallback to local
         absolute_path = os.path.join(os.getcwd(), 'static', 'proposals', filename)
         
         if os.path.exists(absolute_path):
