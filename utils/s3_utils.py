@@ -25,16 +25,9 @@ def get_s3_client():
 
 def upload_to_s3(file_obj, bucket_name, s3_key):
     """
-    Uploads a file object to S3.
+    Uploads a file object to the configured storage provider.
+    Maintains the 'upload_to_s3' name for backward compatibility.
     """
-    s3_client = get_s3_client()
-    if not s3_client:
-        return False, "S3 client could not be initialized (Missing credentials)."
-        
-    try:
-        s3_client.upload_fileobj(file_obj, bucket_name, s3_key)
-        return True, f"Successfully uploaded to s3://{bucket_name}/{s3_key}"
-    except NoCredentialsError:
-        return False, "Credentials not available for S3 upload."
-    except Exception as e:
-        return False, str(e)
+    from services.storage import get_storage_provider
+    provider = get_storage_provider()
+    return provider.save_file(file_obj, bucket_name, s3_key)

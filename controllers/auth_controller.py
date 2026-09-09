@@ -31,26 +31,6 @@ def login():
                 }
             })
         else:
-            # Support fallback for offline/no database mode
-            if username == "admin" and password == "password123":
-                return success_response({
-                    "token": "mock-jwt-token-for-admin-fallback",
-                    "user": {
-                        "id": 1,
-                        "username": "admin",
-                        "role": "admin"
-                    }
-                })
             return error_response("Invalid username or password", status_code=401)
     except Exception as e:
-        # DB may not be reachable, fallback
-        if username == "admin" and password == "password123":
-            return success_response({
-                "token": "mock-jwt-token-for-admin-fallback",
-                "user": {
-                    "id": 1,
-                    "username": "admin",
-                    "role": "admin"
-                }
-            })
         return error_response(f"Login server error: {str(e)}", status_code=500)
