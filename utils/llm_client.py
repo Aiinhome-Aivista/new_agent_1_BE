@@ -3,6 +3,7 @@ import os
 import json
 import requests
 from dotenv import load_dotenv
+from utils.token_counter import add_tokens
 
 load_dotenv(override=True)
 
@@ -46,6 +47,14 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
             response = requests.post(url, json=payload, headers=headers, timeout=300)
             if response.status_code == 200:
                 res_json = response.json()
+                
+                # Token tracking
+                usage = res_json.get("usageMetadata", {})
+                prompt_tokens = usage.get("promptTokenCount", 0)
+                completion_tokens = usage.get("candidatesTokenCount", 0)
+                total_tokens = usage.get("totalTokenCount", 0)
+                add_tokens(prompt_tokens, completion_tokens, total_tokens)
+
                 candidates = res_json.get("candidates", [])
                 if candidates:
                     parts = candidates[0].get("content", {}).get("parts", [])
@@ -80,6 +89,14 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
             response = requests.post(url, json=payload, headers=headers, timeout=300)
             if response.status_code == 200:
                 res_json = response.json()
+                
+                # Token tracking
+                usage = res_json.get("usage", {})
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                total_tokens = usage.get("total_tokens", 0)
+                add_tokens(prompt_tokens, completion_tokens, total_tokens)
+
                 choices = res_json.get("choices", [])
                 if choices:
                     return choices[0].get("message", {}).get("content", "")
@@ -114,6 +131,13 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
         response = requests.post(url_ollama, json=payload_ollama, headers=headers, timeout=300)
         if response.status_code == 200:
             res_json = response.json()
+            
+            # Token tracking
+            prompt_tokens = res_json.get("prompt_eval_count", 0)
+            completion_tokens = res_json.get("eval_count", 0)
+            total_tokens = prompt_tokens + completion_tokens
+            add_tokens(prompt_tokens, completion_tokens, total_tokens)
+
             return res_json.get("message", {}).get("content", "")
         else:
             print(f"Ollama API failed with status {response.status_code}: {response.text}")
@@ -140,6 +164,14 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
         response = requests.post(url_openai, json=payload_openai, headers=headers, timeout=300)
         if response.status_code == 200:
             res_json = response.json()
+            
+            # Token tracking
+            usage = res_json.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            total_tokens = usage.get("total_tokens", 0)
+            add_tokens(prompt_tokens, completion_tokens, total_tokens)
+
             choices = res_json.get("choices", [])
             if choices:
                 return choices[0].get("message", {}).get("content", "")

@@ -3,6 +3,7 @@ import json
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
+from agents.langchain_llm import TokenUsageCallbackHandler
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
@@ -192,7 +193,7 @@ def generate_pptx_dynamically(data: dict, output_path: str):
         save_presentation
     ]
 
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0) # Requires OPENAI_API_KEY in env
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, callbacks=[TokenUsageCallbackHandler()]) # Requires OPENAI_API_KEY in env
     agent_executor = create_react_agent(llm, tools)
 
     system_prompt = f"""

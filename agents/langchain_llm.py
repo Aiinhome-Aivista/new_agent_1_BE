@@ -2,6 +2,8 @@ import os
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.callbacks import BaseCallbackHandler
+from utils.token_counter import add_tokens
 
 load_dotenv(override=True)
 
@@ -13,6 +15,16 @@ MODEL_NAME = os.getenv("MODEL_NAME", "mistral-small-latest")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
+class TokenUsageCallbackHandler(BaseCallbackHandler):
+    def on_llm_end(self, response, **kwargs):
+        if response.llm_output is not None:
+            token_usage = response.llm_output.get("token_usage", {})
+            prompt_tokens = token_usage.get("prompt_tokens", 0)
+            completion_tokens = token_usage.get("completion_tokens", 0)
+            total_tokens = token_usage.get("total_tokens", 0)
+            
+            # Print it
+            add_tokens(prompt_tokens, completion_tokens, total_tokens)
 
 def get_llm(temperature=0.2, json_mode=False):
     """
@@ -24,6 +36,8 @@ def get_llm(temperature=0.2, json_mode=False):
     if json_mode:
         model_kwargs["response_format"] = {"type": "json_object"}
 
+    callbacks = [TokenUsageCallbackHandler()]
+
     if MODE.lower() == "gemini":
         print(f"[SUCCESS] LangChain: Connecting to Gemini API (Model: {GEMINI_MODEL})")
         if not GEMINI_API_KEY:
@@ -34,7 +48,8 @@ def get_llm(temperature=0.2, json_mode=False):
             model=GEMINI_MODEL,
             google_api_key=GEMINI_API_KEY,
             temperature=temperature,
-            model_kwargs=model_kwargs
+            model_kwargs=model_kwargs,
+            callbacks=callbacks
         )
     elif MODE.lower() == "cloud":
         print(f"[SUCCESS] LangChain: Connecting to Mistral Cloud API (Model: {MODEL_NAME})")
@@ -46,7 +61,8 @@ def get_llm(temperature=0.2, json_mode=False):
             model=MODEL_NAME,
             temperature=temperature,
             model_kwargs=model_kwargs,
-            timeout=300
+            timeout=300,
+            callbacks=callbacks
         )
     else:
         print(f"[SUCCESS] LangChain: Connecting to Local Mistral (URL: {MISTRAL_LOCAL_URL}, Model: {MISTRAL_LOCAL_MODEL})")
@@ -59,5 +75,6 @@ def get_llm(temperature=0.2, json_mode=False):
             model=MISTRAL_LOCAL_MODEL,
             temperature=temperature,
             model_kwargs=model_kwargs,
-            timeout=300
+            timeout=300,
+            callbacks=callbacks
         )
