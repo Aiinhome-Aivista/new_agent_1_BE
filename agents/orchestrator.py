@@ -524,8 +524,16 @@ def run_orchestration(proposal_id, client_name, project_duration, budget, files_
         logs = f"RAG Grounding complete: Mapped {len(matched)} requirement(s) to assets. Flagged {len(gaps)} gap(s)."
         update_step_status(proposal_id, "Analyzing", "completed", logs)
 
+        # Determine document title
+        doc_title = "Autonomous Proposal Document Creator Platform"
+        if files_info and len(files_info) > 0:
+            orig_name = files_info[0].get("original_name", "")
+            if orig_name:
+                doc_title = os.path.splitext(orig_name)[0]
+
         # PAUSE HERE: Save intermediate state to structured_json_ir so Phase 2 can pick it up.
         partial_state = {
+            "doc_title": doc_title,
             "client_name": client_name,
             "project_duration": project_duration,
             "budget": budget,
@@ -593,6 +601,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
         structured_case_studies = partial_state.get("structured_case_studies", [])
         ppt_template_path = partial_state.get("ppt_template_path", None)
         template_type = partial_state.get("template_type", "default")
+        doc_title = partial_state.get("doc_title", "Autonomous Proposal Document Creator Platform")
         
         full_document_text = partial_state.get("full_document_text", "")
         if not full_document_text and files_info:
@@ -790,7 +799,7 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             final_similar_projects = design_data.get("similar_projects", [])
 
         draft_ir = {
-            "proposal_title": "Autonomous Proposal Document Creator Platform",
+            "proposal_title": doc_title,
             "client_name": client_name,
             "project_duration": project_duration,
             "budget": budget,

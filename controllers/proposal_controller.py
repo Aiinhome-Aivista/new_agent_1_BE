@@ -271,7 +271,7 @@ def get_proposals_list():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT id, client_name, project_duration, budget, status, generated_file_path, created_at FROM proposals ORDER BY created_at DESC")
+        cursor.execute("SELECT id, client_name, project_duration, budget, status, generated_file_path, created_at, files_info FROM proposals ORDER BY created_at DESC")
         rows = cursor.fetchall()
         cursor.close()
         conn.close()
