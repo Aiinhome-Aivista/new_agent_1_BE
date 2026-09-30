@@ -187,6 +187,25 @@ class DesignAgent:
             }
         ]
         
+        default_technical_key_points = [
+            {"title": "Core System Implementation", "bullets": ["Deploy secure API endpoints", "Establish database schemas"]},
+            {"title": "Security & Compliance", "bullets": ["Implement Role-Based Access Control", "Enable data encryption at rest and in transit"]}
+        ]
+        default_approach_steps = [
+            {"phase": "Phase 1: Discovery & Design", "bullets": ["Gather detailed requirements", "Finalize architecture blueprints"]},
+            {"phase": "Phase 2: Development & Testing", "bullets": ["Sprint-based agile development", "Continuous QA integration"]}
+        ]
+        default_in_scope = [
+            {"module": "Core Application Features", "access": "Admin & Users", "points": ["Dashboard and analytics", "User management and onboarding"]}
+        ]
+        default_out_scope = [
+            {"module": "Legacy Systems Integration", "access": "N/A", "points": ["Migration of legacy tape drives", "Third-party ERP customizations"]}
+        ]
+        default_considerations = [
+            {"topic": "Data Migration Assumptions", "bullets": ["Client will provide cleansed data extracts", "Downtime window is approved for weekends"]},
+            {"topic": "Infrastructure", "bullets": ["Cloud resources will be provisioned in client tenant"]}
+        ]
+
         try:
             res = chain.invoke({
                 "ui_tech": ui_tech,
@@ -221,7 +240,13 @@ class DesignAgent:
                 "architecture": arch,
                 "infrastructure_approximation": design_data.get("infrastructure_approximation", default_infrastructure),
                 "similar_projects": design_data.get("similar_projects", default_similar_projects),
-                "complex_diagrams": diags
+                "complex_diagrams": diags,
+                "technical_key_points": design_data.get("technical_key_points", default_technical_key_points),
+                "technical_key_points_mermaid": design_data.get("technical_key_points_mermaid", ""),
+                "approach_steps": design_data.get("approach_steps", default_approach_steps),
+                "understanding_in_scope": design_data.get("understanding_in_scope", default_in_scope),
+                "understanding_out_scope": design_data.get("understanding_out_scope", default_out_scope),
+                "considerations_topics": design_data.get("considerations_topics", default_considerations)
             }
         except Exception as e:
             print(f"Error in Solution Design Agent: {e}")
@@ -232,5 +257,11 @@ class DesignAgent:
                 "architecture": default_architecture,
                 "infrastructure_approximation": default_infrastructure,
                 "similar_projects": default_similar_projects,
-                "complex_diagrams": default_complex_diagrams
+                "complex_diagrams": default_complex_diagrams,
+                "technical_key_points": default_technical_key_points,
+                "technical_key_points_mermaid": "",
+                "approach_steps": default_approach_steps,
+                "understanding_in_scope": default_in_scope,
+                "understanding_out_scope": default_out_scope,
+                "considerations_topics": default_considerations
             }

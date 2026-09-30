@@ -608,6 +608,204 @@ def get_dynamic_header(data, slide_key, default_title, default_subtitle):
     subtitle = slide_header.get("subtitle", default_subtitle)
     return title, subtitle
 
+def add_technical_key_points_slide(slide, data):
+    title, subtitle = get_dynamic_header(data, "technical_key_points", "Technical Key Points", "Immediate needs (Phase 1)")
+    create_slide_header(slide, title, subtitle)
+    add_footer(slide)
+
+    tkp_title = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9.0), Inches(4.0))
+    tf_tkp = tkp_title.text_frame
+    tf_tkp.word_wrap = True
+    
+    points = data.get("technical_key_points", [
+        {"title": "Create a portal in SharePoint to onboard employees", "bullets": [
+            "Manually user groups will be created for admins",
+            "Access will be provided across site objects"
+        ]},
+        {"title": "Create a tracking mechanism of the trainings", "bullets": [
+            "Custom web part and API will be implemented to fetch reports"
+        ]}
+    ])
+    
+    for pt in points:
+        p_item = tf_tkp.add_paragraph() if tf_tkp.paragraphs[0].text else tf_tkp.paragraphs[0]
+        p_item.text = f"• {safe_text(pt.get('title', ''))}"
+        set_font(p_item.runs[0], size=12, bold=True, color=CHARCOAL)
+        p_item.space_after = Pt(6)
+        
+        for bullet in pt.get("bullets", []):
+            p_sub = tf_tkp.add_paragraph()
+            p_sub.text = f"    1. {safe_text(bullet)}"
+            set_font(p_sub.runs[0], size=11, color=CHARCOAL)
+            p_sub.space_after = Pt(4)
+
+    mermaid_code = data.get("technical_key_points_mermaid")
+    if mermaid_code:
+        temp_img_path = render_mermaid_to_image(mermaid_code)
+        if temp_img_path and os.path.exists(temp_img_path):
+            try:
+                add_picture_proportionally(slide, temp_img_path, Inches(1.0), Inches(4.5), Inches(8.0), Inches(2.2))
+            except Exception as e:
+                pass
+            finally:
+                try:
+                    os.remove(temp_img_path)
+                except:
+                    pass
+
+def add_approach_slide(slide, data):
+    title, subtitle = get_dynamic_header(data, "approach", "Approach", "Execution Steps")
+    create_slide_header(slide, title, subtitle)
+    add_footer(slide)
+    
+    app_title = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9.0), Inches(5.5))
+    tf_app = app_title.text_frame
+    tf_app.word_wrap = True
+    
+    steps = data.get("approach_steps", [
+        {"phase": "Project Kick-Off - Onetime", "bullets": [
+            "Identify the Project Owner and Project Manager",
+            "High level sign off on functionalities"
+        ]},
+        {"phase": "Requirement Gathering - Delivery wise", "bullets": [
+            "Identify targeted users",
+            "Finalize wireframes"
+        ]}
+    ])
+    
+    for step in steps:
+        p_item = tf_app.add_paragraph() if tf_app.paragraphs[0].text else tf_app.paragraphs[0]
+        p_item.text = f"• {safe_text(step.get('phase', ''))}"
+        set_font(p_item.runs[0], size=12, bold=True, color=CHARCOAL)
+        p_item.space_after = Pt(6)
+        
+        for idx, bullet in enumerate(step.get("bullets", [])):
+            p_sub = tf_app.add_paragraph()
+            p_sub.text = f"    {idx+1}. {safe_text(bullet)}"
+            set_font(p_sub.runs[0], size=11, color=CHARCOAL)
+            p_sub.space_after = Pt(4)
+
+def add_our_understanding_slide(slide, data):
+    title, subtitle = get_dynamic_header(data, "our_understanding", "Our Understanding", "In Scope and Out of Scope Analysis")
+    create_slide_header(slide, title, subtitle)
+    add_footer(slide)
+    
+    # In Scope Table
+    in_scope = data.get("understanding_in_scope", [
+        {"module": "Basic Site", "access": "Admin", "points": ["Admin can add events", "Admin can manage news"]}
+    ])
+    
+    if in_scope:
+        # Create In Scope table
+        rows = sum(max(1, len(item.get("points", []))) for item in in_scope) + 1
+        rows = min(rows, 6)
+        try:
+            table_shape = slide.shapes.add_table(rows, 3, Inches(0.5), Inches(1.5), Inches(4.3), Inches(0.4 * rows))
+            table = table_shape.table
+            table.columns[0].width = Inches(0.8)
+            table.columns[1].width = Inches(0.8)
+            table.columns[2].width = Inches(2.7)
+            
+            headers = ["Module", "Access", "Key Points"]
+            for j, header in enumerate(headers):
+                cell = table.cell(0, j)
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = ORANGE
+                p = cell.text_frame.paragraphs[0]
+                p.text = safe_text(header)
+                set_font(p.runs[0], size=10, bold=True, color=WHITE)
+            
+            row_idx = 1
+            for item in in_scope:
+                pts = item.get("points", [])
+                if not pts:
+                    pts = [""]
+                for pt in pts:
+                    if row_idx >= rows: break
+                    table.cell(row_idx, 0).text = safe_text(item.get("module", ""))
+                    table.cell(row_idx, 1).text = safe_text(item.get("access", ""))
+                    table.cell(row_idx, 2).text = safe_text(pt)
+                    for j in range(3):
+                        table.cell(row_idx, j).fill.solid()
+                        table.cell(row_idx, j).fill.fore_color.rgb = OFF_WHITE
+                        set_font(table.cell(row_idx, j).text_frame.paragraphs[0].runs[0], size=9, color=CHARCOAL)
+                    row_idx += 1
+        except:
+            pass
+
+    # Out Scope Table
+    out_scope = data.get("understanding_out_scope", [
+        {"module": "Basic Site", "access": "Admin", "points": ["Create different Groups"]}
+    ])
+    
+    if out_scope:
+        rows = sum(max(1, len(item.get("points", []))) for item in out_scope) + 1
+        rows = min(rows, 6)
+        try:
+            table_shape2 = slide.shapes.add_table(rows, 3, Inches(5.2), Inches(1.5), Inches(4.3), Inches(0.4 * rows))
+            table2 = table_shape2.table
+            table2.columns[0].width = Inches(0.8)
+            table2.columns[1].width = Inches(0.8)
+            table2.columns[2].width = Inches(2.7)
+            
+            headers = ["Module", "Access", "Key Points"]
+            for j, header in enumerate(headers):
+                cell = table2.cell(0, j)
+                cell.fill.solid()
+                cell.fill.fore_color.rgb = CHARCOAL
+                p = cell.text_frame.paragraphs[0]
+                p.text = safe_text(header)
+                set_font(p.runs[0], size=10, bold=True, color=WHITE)
+            
+            row_idx = 1
+            for item in out_scope:
+                pts = item.get("points", [])
+                if not pts:
+                    pts = [""]
+                for pt in pts:
+                    if row_idx >= rows: break
+                    table2.cell(row_idx, 0).text = safe_text(item.get("module", ""))
+                    table2.cell(row_idx, 1).text = safe_text(item.get("access", ""))
+                    table2.cell(row_idx, 2).text = safe_text(pt)
+                    for j in range(3):
+                        table2.cell(row_idx, j).fill.solid()
+                        table2.cell(row_idx, j).fill.fore_color.rgb = LIGHT_GREY
+                        set_font(table2.cell(row_idx, j).text_frame.paragraphs[0].runs[0], size=9, color=CHARCOAL)
+                    row_idx += 1
+        except:
+            pass
+
+def add_considerations_slide(slide, data):
+    title, subtitle = get_dynamic_header(data, "considerations", "Considerations", "Topics & Assumptions")
+    create_slide_header(slide, title, subtitle)
+    add_footer(slide)
+    
+    cons_title = slide.shapes.add_textbox(Inches(0.5), Inches(1.2), Inches(9.0), Inches(5.5))
+    tf_cons = cons_title.text_frame
+    tf_cons.word_wrap = True
+    
+    topics = data.get("considerations_topics", [
+        {"topic": "Content Creation and Tracking", "bullets": [
+            "Video contents will be created by another vendor",
+            "Need a discussion to track video endings"
+        ]},
+        {"topic": "Collaboration Group Creation", "bullets": [
+            "For now, we are considering a request-service framework"
+        ]}
+    ])
+    
+    for top in topics:
+        p_item = tf_cons.add_paragraph() if tf_cons.paragraphs[0].text else tf_cons.paragraphs[0]
+        p_item.text = f"• {safe_text(top.get('topic', ''))}"
+        set_font(p_item.runs[0], size=12, bold=True, color=CHARCOAL)
+        p_item.space_after = Pt(6)
+        
+        for idx, bullet in enumerate(top.get("bullets", [])):
+            p_sub = tf_cons.add_paragraph()
+            p_sub.text = f"    {idx+1}. {safe_text(bullet)}"
+            set_font(p_sub.runs[0], size=11, color=CHARCOAL)
+            p_sub.space_after = Pt(4)
+
 def generate_pptx(data, output_path, template_path=None):
     if template_path and os.path.exists(template_path):
         prs = Presentation(template_path)
@@ -680,6 +878,21 @@ def generate_pptx(data, output_path, template_path=None):
             p_sum.alignment = PP_ALIGN.JUSTIFY
             set_font(p_sum.runs[0], size=14, color=CHARCOAL)
             p_sum.space_after = Pt(14)
+
+    # ----------------------------------------------------
+    # NEW SLIDES
+    # ----------------------------------------------------
+    slide = prs.slides.add_slide(blank_slide_layout)
+    add_technical_key_points_slide(slide, data)
+
+    slide = prs.slides.add_slide(blank_slide_layout)
+    add_approach_slide(slide, data)
+
+    slide = prs.slides.add_slide(blank_slide_layout)
+    add_our_understanding_slide(slide, data)
+
+    slide = prs.slides.add_slide(blank_slide_layout)
+    add_considerations_slide(slide, data)
 
     # ----------------------------------------------------
     # SLIDE 2: Client Requirements & Gap Analysis

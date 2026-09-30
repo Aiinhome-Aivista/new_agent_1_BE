@@ -2,6 +2,7 @@ from utils.prompts import LLM_CLIENT_SYS_PROMPT_0
 import os
 import json
 import requests
+import time
 from dotenv import load_dotenv
 from utils.token_counter import add_tokens
 
@@ -15,7 +16,15 @@ MODEL_NAME = os.getenv("MODEL_NAME", "mistral-small-latest")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 
-def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json_mode=False):
+# Local LLM Performance Settings
+LLM_STREAM = str(os.getenv("LLM_STREAM", "false")).lower() == "true"
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))
+LLM_NUM_CTX = int(os.getenv("LLM_NUM_CTX", "4096"))
+LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "30m")
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.15"))
+LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.9"))
+
+def query_llm(system_prompt, user_prompt, temperature=None, max_tokens=None, json_mode=False):
     """
     Sends a chat completion request to the chosen LLM endpoint.
     """
@@ -108,37 +117,78 @@ def query_llm(system_prompt, user_prompt, temperature=0.2, max_tokens=2048, json
             print(f"Mistral Cloud API request exception: {e}")
             return None
     
+    # Use .env settings, fallback to function arguments if .env is missing/default
+    final_temp = temperature if temperature is not None else LLM_TEMPERATURE
+    final_max_tokens = max_tokens if max_tokens is not None else LLM_MAX_TOKENS
+
     print(f"[SUCCESS] REST Client: Connecting to Local Mistral (URL: {MISTRAL_LOCAL_URL}, Model: {MISTRAL_LOCAL_MODEL})")
     # Try Ollama endpoint format first for Local Mode
     url_ollama = f"{MISTRAL_LOCAL_URL.rstrip('/')}/api/chat"
     payload_ollama = {
         "model": MISTRAL_LOCAL_MODEL,
+        "keep_alive": LLM_KEEP_ALIVE,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
         "options": {
-            "temperature": temperature,
-            "num_predict": max_tokens
+            "temperature": final_temp,
+            "top_p": LLM_TOP_P,
+            "num_predict": final_max_tokens,
+            "num_ctx": LLM_NUM_CTX
         },
-        "stream": False
+        "stream": LLM_STREAM
     }
     
     if json_mode:
         payload_ollama["format"] = "json"
         
     try:
-        response = requests.post(url_ollama, json=payload_ollama, headers=headers, timeout=300)
+        start_time = time.time()
+        # Enable stream parameter in requests if LLM_STREAM is true
+        response = requests.post(url_ollama, json=payload_ollama, headers=headers, stream=LLM_STREAM, timeout=300)
+        
         if response.status_code == 200:
-            res_json = response.json()
-            
-            # Token tracking
-            prompt_tokens = res_json.get("prompt_eval_count", 0)
-            completion_tokens = res_json.get("eval_count", 0)
-            total_tokens = prompt_tokens + completion_tokens
-            add_tokens(prompt_tokens, completion_tokens, total_tokens)
+            if LLM_STREAM:
+                # Handle Streaming response internally to calculate latencies
+                first_token_time = None
+                full_content = ""
+                prompt_tokens = 0
+                completion_tokens = 0
+                
+                for line in response.iter_lines():
+                    if line:
+                        if first_token_time is None:
+                            first_token_time = time.time()
+                            first_latency = (first_token_time - start_time) * 1000
+                            print(f"[LLM] First-token latency: {first_latency:.2f} ms")
+                            
+                        chunk = json.loads(line.decode('utf-8'))
+                        if "message" in chunk and "content" in chunk["message"]:
+                            full_content += chunk["message"]["content"]
+                            
+                        if chunk.get("done"):
+                            prompt_tokens = chunk.get("prompt_eval_count", 0)
+                            completion_tokens = chunk.get("eval_count", 0)
+                            
+                total_time = (time.time() - start_time) * 1000
+                print(f"[LLM] Total response time: {total_time:.2f} ms")
+                total_tokens = prompt_tokens + completion_tokens
+                add_tokens(prompt_tokens, completion_tokens, total_tokens)
+                return full_content
+            else:
+                # Synchronous response handling (if stream=false)
+                res_json = response.json()
+                total_time = (time.time() - start_time) * 1000
+                print(f"[LLM] Total response time (No Stream): {total_time:.2f} ms")
+                
+                # Token tracking
+                prompt_tokens = res_json.get("prompt_eval_count", 0)
+                completion_tokens = res_json.get("eval_count", 0)
+                total_tokens = prompt_tokens + completion_tokens
+                add_tokens(prompt_tokens, completion_tokens, total_tokens)
 
-            return res_json.get("message", {}).get("content", "")
+                return res_json.get("message", {}).get("content", "")
         else:
             print(f"Ollama API failed with status {response.status_code}: {response.text}")
     except Exception as e:

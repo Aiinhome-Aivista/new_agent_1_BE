@@ -815,7 +815,13 @@ def resume_orchestration_phase2(proposal_id, ui_tech, backend_tech, db_tech, fin
             "resources": resources,
             "skills_mapping": skills_mapping,
             "complex_diagrams": design_data.get("complex_diagrams", []),
-            "template_type": template_type
+            "template_type": template_type,
+            "technical_key_points": design_data.get("technical_key_points") or [],
+            "technical_key_points_mermaid": design_data.get("technical_key_points_mermaid") or "",
+            "approach_steps": design_data.get("approach_steps") or [],
+            "understanding_in_scope": design_data.get("understanding_in_scope") or [],
+            "understanding_out_scope": design_data.get("understanding_out_scope") or [],
+            "considerations_topics": design_data.get("considerations_topics") or []
         }
         update_proposal_status(proposal_id, "WaitingForRateConfirmation", json_ir=json.dumps(draft_ir))
         return
@@ -889,7 +895,7 @@ def resume_orchestration_phase3(proposal_id, updated_resources):
         else:
             final_ir_data = safe_json_loads(final_ir_raw, draft_ir)
             # Ensure non-LLM modified fields like extracted images are preserved
-            for key in ["similar_projects", "complex_diagrams"]:
+            for key in ["similar_projects", "complex_diagrams", "technical_key_points", "technical_key_points_mermaid", "approach_steps", "understanding_in_scope", "understanding_out_scope", "considerations_topics"]:
                 if key in draft_ir:
                     final_ir_data[key] = draft_ir[key]
         

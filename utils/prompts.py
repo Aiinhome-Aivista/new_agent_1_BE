@@ -39,77 +39,165 @@ INTAKE_AGENT_PROMPT_1 = ChatPromptTemplate.from_messages([
 # Extracted from requirement_agent.py
 # This prompt extracts the top 5 technical and business requirements from a document.
 REQUIREMENT_AGENT_PROMPT_0 = ChatPromptTemplate.from_messages([
-            ("system", (
-                "You are a pre-sales engineering assistant.\n"
-                "Given the client document text, extract the top 5 technical and business requirements for this solution.\n"
-                "Respond ONLY as a JSON list of strings, with no other text, comments or markdown blocks.\n"
-                "Example format:\n"
-                "[\n"
-                "  \"Requirement 1\",\n"
-                "  \"Requirement 2\"\n"
-                "]"
-            )),
-            ("user", "Client Document Text:\n\n{text}")
-        ])
+    ("system", (
+        "You are a pre-sales engineering assistant.\n"
+        "Analyze the client document and extract the most important business and technical requirements.\n"
+        "Determine the number of requirements dynamically based on the document complexity and content. "
+        "Do not use a fixed number. Return only meaningful, non-duplicate requirements.\n"
+        "Prioritize core business needs, functional requirements, technical requirements, "
+        "security, integrations, performance, constraints, and delivery expectations when applicable.\n"
+        "Do not invent requirements that are not supported by the document.\n"
+        "Keep each requirement concise and presentation-ready.\n"
+        "Respond ONLY as a JSON list of strings. No markdown or explanation."
+    )),
+    ("user", "Client Document Text:\n\n{text}")
+])
 
 # Extracted from requirement_agent.py
 # This prompt analyzes the technology stack and recommends 3 options for UI, backend, and DB, along with AI models if applicable.
 REQUIREMENT_AGENT_PROMPT_1 = ChatPromptTemplate.from_messages([
-            ("system", (
-                "You are an expert IT Solutions Architect, Mobile Developer, and AI/ML Consultant.\n"
-                "Your job is to read the client RFP/document extremely carefully to understand all requirements, constraints, and scope.\n\n"
-                "STEP 1: Identify the CORE application type described in the document. Is it a:\n"
-                "- Web Application?\n"
-                "- Mobile Application?\n"
-                "- Data Engineering / ETL / Analytics Pipeline?\n"
-                "- AI/ML or RAG Platform?\n"
-                "- Desktop Application?\n"
-                "Identify this based on details in the document.\n\n"
-                "STEP 2: Recommend exactly 3 distinct technology options (packages) tailored specifically for that application type end-to-end.\n"
-                "Choose the appropriate UI, backend, and database frameworks depending on the type:\n"
-                "- For Mobile Apps: Recommends mobile UI frameworks (e.g., 'react_native', 'flutter', 'swift_ui', 'kotlin') for the UI field.\n"
-                "- For Data Engineering: Recommends data/pipeline libraries (e.g., 'pyspark', 'dbt', 'apache_airflow') for the UI/Backend fields, and warehouse/caching (e.g. 'snowflake', 'cassandra', 'redis') for the Database field.\n"
-                "- For AI/ML/RAG: Recommends UI frameworks (e.g. 'react', 'streamlit', 'gradio') for the UI field, AI-friendly backend APIs (e.g., 'fastapi', 'flask') for the Backend field, and database solutions including vector stores (e.g. 'postgresql & chromadb', 'pinecone', 'redis') for the Database field.\n"
-                "- For Web Apps: Recommends standard web tools (e.g. 'react', 'angular', 'vue', 'nestjs', 'flask', 'django', 'spring_boot', 'postgresql', 'mysql', 'mongodb').\n\n"
-                "Requirements for the 3 options:\n"
-                "- You must perform a deep analysis of the document to understand the true business and technical needs.\n"
-                "- Do NOT force the options into arbitrary hardcoded categories. Instead, recommend the 3 most optimal, modern technology stacks that perfectly solve the specific problem described in the document.\n"
-                "- Ensure each option is distinct, highly relevant, and practical for the client's actual use case.\n\n"
-                "CRITICAL INSTRUCTION FOR AI APPLICATIONS & MODELS:\n"
-                "Check if the document or requirements mention artificial intelligence, machine learning, deep learning, LLMs, chatbots, RAG pipelines, agents, recommendations, or semantic search.\n"
-                "If it is an AI application, you MUST include a list of the best AI models to use in the 'ai_models' list. If it is NOT an AI application, leave 'ai_models' as an empty list [].\n"
-                "When populating 'ai_models':\n"
-                "- If the document explicitly mentions specific AI model names (e.g. Llama 3, GPT-4), you MUST extract and return EXACTLY those mentioned models, and do not add arbitrary suggestions. For these models, you MUST append ' (Mentioned in INPUT Document)' to their names.\n"
-                "- If no specific models are mentioned, recommend exactly 4-5 strings representing the best AI models for this specific stack. You MUST append ' and above' to each model name.\n"
-                "- VERY IMPORTANT SORTING RULE: You MUST always sort the final 'ai_models' list so that FREE / OPEN-SOURCE models (e.g. Llama, Mistral, Gemma) appear FIRST at the top of the list, followed by paid/proprietary models.\n\n"
-                "Respond ONLY with a JSON object containing the following keys:\n"
-                "1. 'extracted_technologies': An object with 'ui' (string or null), 'backend' (string or null), and 'database' (string or null) representing technologies explicitly requested in the document.\n"
-                "2. 'tech_options': A list of exactly 3 objects. Each object represents an option and must have:\n"
-                "   - 'id': String slug (e.g. 'option_1', 'option_2', 'option_3')\n"
-                "   - 'name': Clear display name (e.g. 'Option 1: Modern Cross-Platform Mobile (Recommended)'). If the primary technologies in this option were explicitly requested in the document, you MUST append ' (Mentioned in INPUT Document)' to the name.\n"
-                "   - 'ui': UI / Frontend / Mobile technology slug. MUST NOT BE EMPTY OR NULL.\n"
-                "   - 'backend': Backend technology or API framework slug. MUST NOT BE EMPTY OR NULL.\n"
-                "   - 'database': Database / Datastore / Cache / Warehouse technology slug. MUST NOT BE EMPTY OR NULL. Do NOT append vector database extensions (e.g. 'with_pgvector', 'with_vector_search'); just provide the main database name (e.g. 'postgresql', 'mongodb','mysql','mssql','azure sql').\n"
-                "   - 'other_technologies': List of supporting tools/frameworks\n"
-                "   - 'ai_models': The final sorted list of AI models as instructed above. Otherwise an empty list [].\n"
-                "   - 'rationale': One sentence explaining why this stack is a great fit for the client's requirements and the specific application type.\n"
-                "3. 'chat_explanation': A detailed explanation in markdown format representing an AI chat response (RAG Chat style). "
-                "It should introduce the 3 packages, explain the main chosen technologies (including AI model recommendations if applicable), why they are selected based on the requirements and application type, and how they integrate. Use bold text, lists, and a friendly, supportive consulting tone.\n\n"
-                "Do not include any explanation or markdown formatting outside the JSON."
-            )),
-            ("user", "Requirements:\n{requirements}\n\nDocument snippet:\n{text}")
-        ])
+    (
+        "system",
+        (
+            "You are an Enterprise Solution Architect analyzing a client RFP.\n\n"
+
+
+
+
+            "IMPORTANT:\n"
+            "Use ONLY the information contained in the provided CLIENT REQUIREMENTS and DOCUMENT TEXT.\n"
+            "The document is the source of truth.\n"
+            "Do not assume technologies, vendors, cloud platforms, frameworks, databases, "
+            "AI models, integrations, or capabilities that are not supported by the document.\n"
+            "Do not copy technologies from examples in this instruction.\n\n"
+
+
+
+
+            "TASK:\n"
+            "1. Carefully analyze the complete provided document text.\n"
+            "2. Identify the actual application type, business requirements, technical requirements, "
+            "constraints, integrations, security requirements, data requirements, and explicitly "
+            "mentioned technologies.\n"
+            "3. Extract technologies explicitly mentioned in the document.\n"
+            "4. Based on the document context, generate exactly 3 technology stack options.\n\n"
+
+
+
+
+            "TECHNOLOGY RECOMMENDATION RULES:\n"
+            "- Recommendations must be dynamically derived from the document.\n"
+            "- If a technology (like SharePoint) is explicitly mentioned for a layer (e.g. UI), use ONLY that technology for that layer. Do NOT mix it with others (e.g., do not output 'React, SharePoint').\n"
+            "- If the document requires a UI/frontend but does NOT specify one, you MUST provide variety across the 3 options (e.g., React for Option 1, Angular for Option 2, Vue for Option 3).\n"
+            "- If the document requires a backend API or Database but does NOT specify one, you MUST recommend appropriate technologies (e.g., Node.js, .NET, Java for backend; SQL Server, PostgreSQL for DB) to complete the stack, providing variety across options.\n"
+            "- Do not assume AWS, Azure, GCP, PostgreSQL, MySQL, MongoDB, "
+            "FastAPI, Flask, Spring Boot, or any other technology unless clearly required by the stated business or technical requirements.\n"
+            "- If the document mentions a specific integration, platform, vendor, product, or service, "
+            "make sure it is considered during the recommendation.\n"
+            "- The three options should be meaningfully different but all must remain relevant to the document.\n"
+            "- If the document does not explicitly specify enough technologies to form three distinct stacks, "
+            "introduce alternatives only when they are directly justified by the documented requirements.\n\n"
+
+
+            
+            "IMPORTANT FOR EXPLICIT TECHNOLOGIES AND INTEGRATIONS:\n"
+            "- Extract every explicitly mentioned technology, platform, product, vendor, service, integration, "
+            "data source, framework, database, cloud service, or enterprise system from the document.\n"
+            "- Preserve explicitly mentioned items exactly as they appear in the document whenever possible.\n"
+            "- If an explicitly mentioned item is not a UI, backend, or database technology, place it in "
+            "'other_technologies' rather than dropping it.\n"
+            "- Do not omit an explicitly mentioned integration or platform such as an enterprise content system, "
+            "collaboration platform, identity provider, cloud service, or external application.\n"
+            "- Never replace an explicitly mentioned technology with a different technology unless the document "
+            "clearly requires an alternative.\n"
+            "- Every explicitly mentioned technology, platform, integration, vendor, product, or enterprise "
+            "system must be preserved in the final analysis and must not be silently dropped.\n"
+            "- If an explicitly mentioned item is not part of UI, backend, or database, place it under "
+            "'other_technologies' rather than dropping it.\n\n"
+
+
+
+
+            "EXPLICIT TECHNOLOGY EXTRACTION:\n"
+            "The 'extracted_technologies' object must contain only technologies, platforms, products, "
+            "vendors, services, integrations, data sources, frameworks, databases, cloud services, "
+            "and enterprise systems explicitly mentioned in the DOCUMENT TEXT.\n"
+            "Do not infer, recommend, or add technologies to this object.\n"
+            "Classify explicitly mentioned items into 'ui', 'backend', 'database', or 'other'.\n"
+            "If an enterprise platform like SharePoint, PowerApps, or Salesforce is mentioned as the primary user interface or frontend, you MUST classify it strictly under 'ui'.\n"
+            "Any other explicitly mentioned item that does not clearly belong to UI, backend, or database "
+            "must be placed in 'other'.\n"
+            "Preserve the original name from the document whenever possible.\n\n"
+
+
+
+
+            "AI MODEL RULES:\n"
+            "- Only include AI models when the document requires or discusses AI/ML/LLM functionality.\n"
+            "- If specific model names are explicitly mentioned, return only those models and mark them "
+            "as '(Mentioned in INPUT Document)'.\n"
+            "- If no model is mentioned but AI is required, recommend suitable models based on the "
+            "actual documented use case.\n"
+            "- Do not recommend AI models when the document does not require AI functionality.\n\n"
+
+
+
+
+            "OUTPUT:\n"
+                "Return ONLY valid JSON with exactly these keys:\n"
+                "{{\n"
+                '  "extracted_technologies": {{\n'
+                '    "ui": [],\n'
+                '    "backend": [],\n'
+                '    "database": [],\n'
+                '    "other": []\n'
+                "  }},\n"
+                '  "tech_options": [\n'
+                "    {{\n"
+                '      "id": "option_1",\n'
+                '      "name": "...",\n'
+                '      "ui": "...",\n'
+                '      "backend": "...",\n'
+                '      "database": "...",\n'
+                '      "other_technologies": [],\n'
+                '      "ai_models": [],\n'
+                '      "rationale": "..."\n'
+                "    }}\n"
+                "  ],\n"
+                '  "chat_explanation": "..."\n'
+                "}}\n\n"
+
+
+
+            "The response must be grounded in the supplied document. "
+            "Do not include unsupported technologies."
+        )
+    ),
+    (
+        "user",
+        (
+            "CLIENT REQUIREMENTS:\n{requirements}\n\n"
+            "COMPLETE DOCUMENT TEXT:\n{text}\n\n"
+            "Analyze the document carefully and generate the technology recommendations "
+            "strictly from the supplied content."
+        )
+    )
+])
 
 # Extracted from requirement_agent.py
 # This prompt generates a mitigation strategy (1 sentence) for a client requirement that cannot be met by existing assets.
 REQUIREMENT_AGENT_PROMPT_2 = ChatPromptTemplate.from_messages([
-                    ("system", (
-                        "You are a pre-sales consultant. Given a client requirement that we cannot fully "
-                        "meet with existing assets, write exactly one sentence of mitigation (e.g. recruit a specialist "
-                        "contractor or establish a new competence program)."
-                    )),
-                    ("user", "Client Requirement: {req}")
-                ])
+    ("system", (
+        "You are a pre-sales consultant. "
+        "For the given client requirement, write one concise, specific mitigation strategy "
+        "that explains how the capability gap can be addressed. "
+        "Use the requirement itself to determine the appropriate mitigation, such as internal development, "
+        "specialist hiring, partner support, training, tooling, or third-party expertise. "
+        "Avoid generic phrases, repetition, and phrases such as 'our current limitations'. "
+        "Return only one professional sentence suitable for an executive proposal slide."
+    )),
+    ("user", "Client Requirement: {req}")
+])
 
 # Extracted from requirement_agent.py
 # This prompt evaluates if client requirements can be solved by an asset and compiles a final matching report.
@@ -128,23 +216,70 @@ REQUIREMENT_AGENT_PROMPT_3 = ChatPromptTemplate.from_messages([
 # Extracted from requirement_agent.py
 # This prompt extracts constraints like compliance, SLA, scalability, and proposes advanced options (RAG, Action Engines, Guardrails).
 REQUIREMENT_AGENT_PROMPT_4 = ChatPromptTemplate.from_messages([
-            ("system", (
-                "You are an Enterprise Solutions Architect & Action Engine Agent.\n"
-                "Analyze the document text and requirements to determine if advanced features are needed.\n"
-                "Broadly interpret the concepts:\n"
-                "1. RAG (Retrieval-Augmented Generation): Needed if you see concepts like 'Vector Knowledge Base', 'Semantic Engine', 'Vector Semantic Matching', 'Document Search', 'Embedding', or 'Retrieval'.\n"
-                "2. Action Engine (Agentic Frameworks): Needed if you see mutating external actions, multi-step reasoning, dynamic tool usage, or complex workflow orchestration (e.g. 'sending emails', 'writing to external databases', 'dynamic decision making').\n"
-                "3. Guardrails (Data Protection): Needed if you see concepts like 'Sensitive Credential Masking', 'PII', 'Security Separation', 'Secret Variables', 'Data Protection', or 'Compliance'.\n\n"
-                "Respond ONLY with a valid JSON object containing exactly three keys: 'rag_options', 'action_engine_options', and 'guardrail_options'.\n"
-                "If a feature is needed based on the document, dynamically suggest 3-4 appropriate technology options for it.\n"
-                "For 'action_engine_options', you MUST dynamically suggest modern Agentic Frameworks (e.g., 'AWS Bedrock AgentCore', 'LangGraph', 'CrewAI', 'AutoGen') tailored to the specific requirements. Ensure they are fully dynamic and context-aware, not static.\n"
-                "Each option must be a dictionary with an 'id' and 'name'.\n"
-                "CRITICAL INSTRUCTION: If any specific technology (e.g., a particular RAG database, Action Engine framework, or Guardrails tool) is explicitly mentioned in the document, you MUST include it as an option and append ' (Mentioned in INPUT Document)' to its 'name'.\n"
-                "If a feature is NOT needed, its value must be an empty list [].\n"
-                "Do NOT use markdown formatting, output raw JSON only."
-            )),
-            ("user", "Requirements:\n{requirements}\n\nDocument snippet:\n{text}")
-        ])
+    (
+        "system",
+        (
+            "You are an Enterprise Solutions Architect analyzing an RFP.\n\n"
+
+
+            "The provided document is the only source of truth.\n"
+            "Analyze the actual requirements, technologies, integrations, security needs, "
+            "data flows, workflows, and business processes described in the document.\n\n"
+
+
+            "Determine the best technologies for the following capability areas:\n"
+            "1. RAG / Retrieval\n"
+            "2. Action Engine / Agentic Workflow\n"
+            "3. Guardrails / Data Protection\n\n"
+
+
+            "IMPORTANT:\n"
+            "- If the document explicitly mentions a technology, platform, vendor, framework, "
+            "database, cloud service, or product for these areas, preserve it in the relevant option list and mark it as '(Mentioned in INPUT)'.\n"
+            "- If the document does not explicitly specify technologies for these capabilities, you MUST dynamically "
+            "recommend 2-3 suitable best-practice technologies based on the application's actual environment.\n"
+            "- Provide a variety of suitable options (e.g., open-source vs enterprise, different cloud providers if applicable).\n"
+            "- Recommendations must be relevant to the application's overall context and goals.\n\n"
+
+
+            "RAG:\n"
+            "Recommend the best vector databases, semantic search engines, or document retrieval systems (e.g., Pinecone, Weaviate, Azure AI Search, FAISS).\n\n"
+
+
+            "ACTION ENGINE:\n"
+            "Recommend the best agentic frameworks, workflow automation tools, or orchestration engines (e.g., LangChain, AutoGen, CrewAI, Semantic Kernel).\n\n"
+
+
+            "GUARDRAILS:\n"
+            "Recommend the best data protection, PII masking, and security guardrail tools (e.g., NeMo Guardrails, Llama Guard, Presidio, Custom Data Masking).\n\n"
+
+
+            "OUTPUT:\n"
+            "Return ONLY valid JSON with exactly these keys:\n"
+            "{{\n"
+            '  "rag_options": [],\n'
+            '  "action_engine_options": [],\n'
+            '  "guardrail_options": []\n'
+            "}}\n\n"
+
+
+            "Each option must contain:\n"
+            "- id (e.g., 'rag_1')\n"
+            "- name (e.g., 'Pinecone')\n\n"
+
+
+            "Always return at least 1-3 recommended options for each capability area, even if they are not explicitly required by the document."
+        )
+    ),
+    (
+        "user",
+        (
+            "CLIENT REQUIREMENTS:\n{requirements}\n\n"
+            "COMPLETE DOCUMENT TEXT:\n{text}\n\n"
+            "Analyze the document and return the best capability recommendations."
+        )
+    )
+])
 
 # Extracted from design_agent.py
 # This is the main Tree-of-Thoughts (ToT) prompt that designs the system architecture, business summary, pillars, data flow, and infrastructure cost.
@@ -167,8 +302,19 @@ DESIGN_AGENT_PROMPT_0 = ChatPromptTemplate.from_messages([
                 "2. Evaluate each candidate's development cost, delivery risk, scalability, and alignment with the timeline.\n"
                 "3. Choose the best, most compliant option, and render it into the final output format.\n\n"
                 "Your response must ONLY be a JSON object with these keys:\n"
-                "- 'business_summary': a highly detailed and convenient 3-paragraph string summarizing the proposed solution. It MUST strictly focus on the business perspective. Explicitly state why this project is being implemented and clearly articulate the strategic business benefits and advantages (e.g., ROI, operational efficiency, competitive advantage). DO NOT include any technical overview, technology names (e.g., React, FastAPI, Database), or architecture details (e.g., RAG, Guardrails) in this summary.\n"
-                "- 'solution_pillars': a list of exactly 3 objects, each with 'title' (short name) and 'desc' (a concise but informative paragraph of exactly 2 to 3 sentences and maximum 40 words explaining the pillar so the reader understands it well without overflowing the presentation slide).\n"
+                "- 'business_summary': Write a professional executive-level business summary in exactly 3 well-developed paragraphs, "
+                "approximately 180-220 words. Explain the client's business need/problem, the proposed solution and its key business capabilities, "
+                "and the expected business benefits/strategic impact. Keep it specific to the RFP and avoid generic statements. "
+                "Focus strictly on business value and outcomes. Do not mention technologies, frameworks, databases, APIs, architecture, RAG, "
+                "AI models, or infrastructure. Do not invent features, ROI, percentages, cost savings, or other benefits not supported by the RFP. "
+                "Do not produce a short summary or bullet list.\n"
+                "- 'solution_pillars': a list of exactly 3 objects representing the three most important solution capabilities "
+                "for the client's specific requirements. Each object must contain 'title' and 'desc'. "
+                "The titles and descriptions must be derived dynamically from the RFP and should represent distinct business capabilities. "
+                "Each 'desc' should contain 2-3 concise sentences, approximately 30-45 words, explaining what the capability does, "
+                "how it addresses the client's requirements, and its business value. "
+                "Do not use generic or repetitive pillars, and do not invent capabilities that are not supported by the RFP. "
+                "Do not mention specific technologies unless they are directly relevant to explaining the solution capability.\n"
                 "- 'data_flow': a list of exactly 4 strings representing the high-level data flow steps.\n"
                 "- 'architecture': a list of exactly 3 layers (e.g. 'Presentation layer (UI Client)', "
                 "'Application Logic (API Backend)', 'Data Integration & Cache Layer') where each layer object contains "
@@ -194,15 +340,56 @@ DESIGN_AGENT_PROMPT_0 = ChatPromptTemplate.from_messages([
                 "  * 'mermaid_code': a valid, clean Mermaid.js flowchart (starting with 'graph LR' for optimal wide layout) representing that specific architecture of the proposed solution. Follow these strict syntax rules:\n"
                 "    1. Start with 'graph LR'.\n"
                 "    2. Use clear, alphanumeric node IDs (e.g., UI, API, DB).\n"
-                "    3. Enclose all text labels in double quotes (e.g., UI[\"Web UI (React)\"] or DB[(\"PostgreSQL Database\")]) to avoid rendering errors. Do NOT use brackets or parentheses without double quotes around the label text inside the node.\n"
+                "    3. Enclose all text labels in double quotes (e.g., UI[\"Web UI (Angular or relevant UI technology mentioned in the attached document)\"] or DB[(\"PostgreSQL Database\")]) to avoid rendering errors. Do NOT use brackets or parentheses without double quotes around the label text inside the node.\n"
                 "    4. Use standard connectors like --> and subgraph boxes for different layers (e.g. Ingestion, Compute, Storage).\n"
                 "    5. Do NOT include style declarations, class definitions, or CSS inside the Mermaid code.\n"
                 "    6. THE DIAGRAMS MUST BE COMPLETELY DIFFERENT: The 'Reference Architecture' diagram must show generic, logical tiers and data ingestion/processing pipelines (e.g. 'API Gateway', 'Core API Server', 'Cache', 'Object Storage', 'Vector Database', 'Message Queue', 'Auth Service'). "
                 "The 'Landscape Architecture' diagram must map these logical components to actual cloud-native deployment resources of the target cloud provider (identify the provider from the RFP text, e.g. AWS, Azure, or GCP, defaulting to Azure if not specified). E.g. for Azure use 'Azure API Management', 'Azure App Service', 'Azure Cache for Redis', 'Azure Blob Storage', 'Azure Cognitive Search', 'Azure Monitor', organized in clean subgraphs representing VPC/VNet zones, API layer, database layer, and monitoring.\n"
                 "    7. BE DETAILED: Make the flowcharts comprehensive (at least 6-10 nodes each) reflecting the specific needs in the RFP document context (e.g., if database migration is requested, show source systems, transfer utility, target cloud database; if RAG is requested, show document ingestion, vector storage, LLM orchestration, client UI).\n\n"
-                "Do not include any explanation or markdown formatting outside the JSON."
+                "- 'technical_key_points': a list of 4-6 objects representing the immediate technical needs for Phase 1 implementation. "
+                "Each object must contain a 'title' and a 'bullets' list with 2-4 concise but meaningful technical action points. "
+                "The points must be specific to the client's RFP and should cover the most important immediate areas such as core system implementation, "
+                "security and compliance, data management, integrations, authentication/access control, infrastructure, monitoring, performance, "
+                "or other technically relevant areas identified in the RFP. "
+                "Do not generate generic points that are not supported by the RFP. "
+                "Keep each bullet concise and action-oriented so it fits naturally on a presentation slide.\n"
+                "- 'technical_key_points_mermaid': optional mermaid flowchart string for the technical key points.\n"
+                "- 'approach_steps': a list of 4-5 objects representing the complete project execution approach from discovery through deployment and handover. "
+                "Each object must contain a 'phase' and a 'bullets' list with 2-3 concise but meaningful activities. "
+                "The phases should follow a logical project lifecycle based on the RFP, such as Discovery & Design, Development, Integration & Testing, "
+                "User Acceptance & Deployment, and Go-Live & Handover. "
+                "Adapt the phases to the actual project requirements rather than blindly using these names. "
+                "Each bullet must describe a specific project activity or deliverable relevant to the client's RFP. "
+                "Do not generate generic or repetitive activities. Keep the bullets concise and suitable for an executive presentation slide.\n"
+                "- 'understanding_in_scope': a list of 4-6 objects representing the major functional/business modules that are explicitly or clearly supported as being within the project scope. "
+                "Each object must contain 'module', 'access', and 'points'. "
+                "'access' should identify the relevant user role such as Admin, User, Manager, or N/A. "
+                "Each 'points' list should contain 2-4 concise and specific scope items derived from the RFP. "
+                "Group related requirements under meaningful modules instead of creating one module per individual requirement. "
+                "Do not invent modules or capabilities that are not supported by the RFP.\n"
+
+                "- 'understanding_out_scope': a list of 3-5 objects representing major capabilities, integrations, systems, or activities that are explicitly excluded from the project scope or clearly identified as outside the stated requirements. "
+                "Each object must contain 'module', 'access', and 'points'. "
+                "Each 'points' list should contain 1-3 concise and specific out-of-scope items supported by the RFP. "
+                "Do not assume something is out of scope merely because it is not mentioned; include it only when the RFP explicitly excludes it or provides sufficient evidence that it is outside the project scope.\n"
+                "- 'considerations': a list of 4-6 objects representing the key assumptions, dependencies, risks, constraints, and operational considerations relevant to the project. "
+                "Each object must contain a 'title' and a 'bullets' list with 2-3 concise and specific points. "
+                "Cover different relevant areas such as data migration, infrastructure, security and compliance, integrations, "
+                "business/user readiness, dependencies, operational support, or project constraints, but only when supported by the RFP. "
+                "Prioritize the considerations that could affect project delivery, implementation, adoption, or ongoing operations. "
+                "Do not invent assumptions or risks that are not supported or reasonably implied by the RFP. "
+                "Keep each bullet concise, specific, and suitable for an executive presentation slide.\n"
             )),
-            ("user", "Requirements:\n{requirements}\n\nFull RFP Document Text Snippet:\n{full_rfp_text}\n\nBudget: {budget}\nDuration: {duration}\n\nCase Study Documents Text:\n{case_study_text}")
+            (
+                "user",
+                "CLIENT REQUIREMENTS:\n{requirements}\n\n"
+                "RFP DOCUMENT CONTENT:\n{full_rfp_text}\n\n"
+                "BUDGET:\n{budget}\n\n"
+                "PROJECT DURATION:\n{duration}\n\n"
+                "CASE STUDY DOCUMENTS:\n{case_study_text}\n\n"
+                "Generate the business_summary primarily from the client requirements and RFP document content. "
+                "Make the summary specific to the client's actual business need and proposed solution."
+            )
         ])
 # Extracted from orchestrator.py
 ORCHESTRATOR_SYS_PROMPT_0 = (
