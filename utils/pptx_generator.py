@@ -7,8 +7,10 @@ from pptx.enum.shapes import MSO_SHAPE
 
 def safe_text(val):
     if isinstance(val, list):
-        return ", ".join(str(v) for v in val)
-    return str(val) if val is not None else ""
+        res = ", ".join(str(v) for v in val)
+    else:
+        res = str(val) if val is not None else ""
+    return res if str(res).strip() else " "
 
 
 import re
@@ -308,7 +310,8 @@ def add_footer(slide):
     p = txBox.text_frame.paragraphs[0]
     p.text = "Solution Advisory  |  Autonomous Bid Lifecycle Platform  |  AI Draft - For Internal Review Only"
     p.alignment = PP_ALIGN.LEFT
-    set_font(p.runs[0], size=8, bold=False, color=CHARCOAL)
+    if p.runs:
+        set_font(p.runs[0], size=8, bold=False, color=CHARCOAL)
 
 
 def add_reference_architecture_slide(slide, prs, data):
@@ -421,7 +424,8 @@ def add_reference_architecture_slide(slide, prs, data):
     txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(9), Inches(0.4))
     p = txBox.text_frame.paragraphs[0]
     p.text = "Logical Reference Architecture & Component Topology" if is_dynamic else "System Data Flow & Orchestration Architecture"
-    set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
+    if p.runs:
+        set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
 
     # Calculate Y-coordinate limits based on whether description is present
     img_top = Inches(1.5)
@@ -558,7 +562,8 @@ def add_azure_landscape_architecture_slide(slide, prs, data):
     txBox = slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(9), Inches(0.4))
     p = txBox.text_frame.paragraphs[0]
     p.text = f"{cloud_name} Cloud Native Deployment Topology"
-    set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
+    if p.runs:
+        set_font(p.runs[0], size=14, bold=True, color=CHARCOAL)
 
     # Calculate Y-coordinate limits based on whether description is present
     img_top = Inches(1.5)
@@ -697,8 +702,8 @@ def add_our_understanding_slide(slide, data):
     
     if in_scope:
         # Create In Scope table
-        rows = sum(max(1, len(item.get("points", []))) for item in in_scope) + 1
-        rows = min(rows, 6)
+        rows = sum(max(1, len(item.get("points", []))) for item in in_scope) + 2
+        rows = min(rows, 7)
         try:
             table_shape = slide.shapes.add_table(rows, 3, Inches(0.5), Inches(1.5), Inches(4.3), Inches(0.4 * rows))
             table = table_shape.table
@@ -706,32 +711,49 @@ def add_our_understanding_slide(slide, data):
             table.columns[1].width = Inches(0.8)
             table.columns[2].width = Inches(2.7)
             
+            table.cell(0, 0).merge(table.cell(0, 2))
+            title_cell = table.cell(0, 0)
+            title_cell.fill.solid()
+            title_cell.fill.fore_color.rgb = ORANGE
+            p = title_cell.text_frame.paragraphs[0]
+            p.text = "In Scope"
+            p.alignment = PP_ALIGN.CENTER
+            if p.runs:
+                if p.runs:
+                    set_font(p.runs[0], size=11, bold=True, color=WHITE)
+
             headers = ["Module", "Access", "Key Points"]
             for j, header in enumerate(headers):
-                cell = table.cell(0, j)
+                cell = table.cell(1, j)
                 cell.fill.solid()
-                cell.fill.fore_color.rgb = ORANGE
+                cell.fill.fore_color.rgb = OFF_WHITE
                 p = cell.text_frame.paragraphs[0]
                 p.text = safe_text(header)
-                set_font(p.runs[0], size=10, bold=True, color=WHITE)
+                if p.runs:
+                    if p.runs:
+                        set_font(p.runs[0], size=10, bold=True, color=CHARCOAL)
             
-            row_idx = 1
+            row_idx = 2
             for item in in_scope:
                 pts = item.get("points", [])
                 if not pts:
                     pts = [""]
-                for pt in pts:
+                for i, pt in enumerate(pts):
                     if row_idx >= rows: break
-                    table.cell(row_idx, 0).text = safe_text(item.get("module", ""))
-                    table.cell(row_idx, 1).text = safe_text(item.get("access", ""))
+                    table.cell(row_idx, 0).text = safe_text(item.get("module", "")) if i == 0 else ""
+                    table.cell(row_idx, 1).text = safe_text(item.get("access", "")) if i == 0 else ""
                     table.cell(row_idx, 2).text = safe_text(pt)
                     for j in range(3):
-                        table.cell(row_idx, j).fill.solid()
-                        table.cell(row_idx, j).fill.fore_color.rgb = OFF_WHITE
-                        set_font(table.cell(row_idx, j).text_frame.paragraphs[0].runs[0], size=9, color=CHARCOAL)
+                        cell = table.cell(row_idx, j)
+                        cell.fill.solid()
+                        cell.fill.fore_color.rgb = OFF_WHITE
+                        p = cell.text_frame.paragraphs[0]
+                        if p.runs:
+                            if p.runs:
+                                set_font(p.runs[0], size=9, color=CHARCOAL)
                     row_idx += 1
-        except:
-            pass
+        except Exception as e:
+            print(f"Error in In Scope table: {e}")
 
     # Out Scope Table
     out_scope = data.get("understanding_out_scope", [
@@ -739,8 +761,8 @@ def add_our_understanding_slide(slide, data):
     ])
     
     if out_scope:
-        rows = sum(max(1, len(item.get("points", []))) for item in out_scope) + 1
-        rows = min(rows, 6)
+        rows = sum(max(1, len(item.get("points", []))) for item in out_scope) + 2
+        rows = min(rows, 7)
         try:
             table_shape2 = slide.shapes.add_table(rows, 3, Inches(5.2), Inches(1.5), Inches(4.3), Inches(0.4 * rows))
             table2 = table_shape2.table
@@ -748,32 +770,49 @@ def add_our_understanding_slide(slide, data):
             table2.columns[1].width = Inches(0.8)
             table2.columns[2].width = Inches(2.7)
             
+            table2.cell(0, 0).merge(table2.cell(0, 2))
+            title_cell2 = table2.cell(0, 0)
+            title_cell2.fill.solid()
+            title_cell2.fill.fore_color.rgb = CHARCOAL
+            p = title_cell2.text_frame.paragraphs[0]
+            p.text = "Out of Scope"
+            p.alignment = PP_ALIGN.CENTER
+            if p.runs:
+                if p.runs:
+                    set_font(p.runs[0], size=11, bold=True, color=WHITE)
+
             headers = ["Module", "Access", "Key Points"]
             for j, header in enumerate(headers):
-                cell = table2.cell(0, j)
+                cell = table2.cell(1, j)
                 cell.fill.solid()
-                cell.fill.fore_color.rgb = CHARCOAL
+                cell.fill.fore_color.rgb = LIGHT_GREY
                 p = cell.text_frame.paragraphs[0]
                 p.text = safe_text(header)
-                set_font(p.runs[0], size=10, bold=True, color=WHITE)
+                if p.runs:
+                    if p.runs:
+                        set_font(p.runs[0], size=10, bold=True, color=CHARCOAL)
             
-            row_idx = 1
+            row_idx = 2
             for item in out_scope:
                 pts = item.get("points", [])
                 if not pts:
                     pts = [""]
-                for pt in pts:
+                for i, pt in enumerate(pts):
                     if row_idx >= rows: break
-                    table2.cell(row_idx, 0).text = safe_text(item.get("module", ""))
-                    table2.cell(row_idx, 1).text = safe_text(item.get("access", ""))
+                    table2.cell(row_idx, 0).text = safe_text(item.get("module", "")) if i == 0 else ""
+                    table2.cell(row_idx, 1).text = safe_text(item.get("access", "")) if i == 0 else ""
                     table2.cell(row_idx, 2).text = safe_text(pt)
                     for j in range(3):
-                        table2.cell(row_idx, j).fill.solid()
-                        table2.cell(row_idx, j).fill.fore_color.rgb = LIGHT_GREY
-                        set_font(table2.cell(row_idx, j).text_frame.paragraphs[0].runs[0], size=9, color=CHARCOAL)
+                        cell = table2.cell(row_idx, j)
+                        cell.fill.solid()
+                        cell.fill.fore_color.rgb = LIGHT_GREY
+                        p = cell.text_frame.paragraphs[0]
+                        if p.runs:
+                            if p.runs:
+                                set_font(p.runs[0], size=9, color=CHARCOAL)
                     row_idx += 1
-        except:
-            pass
+        except Exception as e:
+            print(f"Error in Out Scope table: {e}")
 
 def add_considerations_slide(slide, data):
     title, subtitle = get_dynamic_header(data, "considerations", "Considerations", "Topics & Assumptions")
@@ -909,7 +948,8 @@ def generate_pptx(data, output_path, template_path=None):
     tf_req.word_wrap = True
     p = tf_req.paragraphs[0]
     p.text = "Key Client Requirements:"
-    set_font(p.runs[0], size=14, bold=True, color=ORANGE)
+    if p.runs:
+        set_font(p.runs[0], size=14, bold=True, color=ORANGE)
     p.space_after = Pt(12)
     
     for req in data.get("requirements", ["No requirements specified"]):
@@ -1093,7 +1133,8 @@ def generate_pptx(data, output_path, template_path=None):
             p = tf.paragraphs[0]
             p.text = safe_text(item_text)
             p.alignment = PP_ALIGN.CENTER
-            set_font(p.runs[0], size=11, bold=True, color=WHITE)
+            if p.runs:
+                set_font(p.runs[0], size=11, bold=True, color=WHITE)
             
             current_top += box_h
             
@@ -1220,7 +1261,8 @@ def generate_pptx(data, output_path, template_path=None):
             p = cell.text_frame.paragraphs[0]
             p.text = hdr
             p.alignment = PP_ALIGN.CENTER
-            set_font(p.runs[0], size=12, bold=True, color=WHITE)
+            if p.runs:
+                set_font(p.runs[0], size=12, bold=True, color=WHITE)
             
         for i, item in enumerate(infra_items):
             row_idx = i + 1
@@ -1234,7 +1276,8 @@ def generate_pptx(data, output_path, template_path=None):
                 p = cell.text_frame.paragraphs[0]
                 p.text = safe_text(val)
                 p.alignment = PP_ALIGN.CENTER if j == 2 else PP_ALIGN.LEFT
-                set_font(p.runs[0], size=11, color=CHARCOAL)
+                if p.runs:
+                    set_font(p.runs[0], size=11, color=CHARCOAL)
 
     # ----------------------------------------------------
     # SLIDE 5: Project Milestones
@@ -1335,7 +1378,8 @@ def generate_pptx(data, output_path, template_path=None):
         p = cell.text_frame.paragraphs[0]
         p.text = safe_text(header)
         p.alignment = PP_ALIGN.CENTER
-        set_font(p.runs[0], size=11, bold=True, color=WHITE)
+        if p.runs:
+            set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
     for i, res in enumerate(resources[:rows-2]):
         row_idx = i + 1
@@ -1347,7 +1391,8 @@ def generate_pptx(data, output_path, template_path=None):
             p = cell.text_frame.paragraphs[0]
             p.text = safe_text(val)
             p.alignment = PP_ALIGN.CENTER if j > 0 else PP_ALIGN.LEFT
-            set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
+            if p.runs:
+                set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
             
     # Add Total Assumption Row
     last_row_idx = rows - 1
@@ -1377,7 +1422,8 @@ def generate_pptx(data, output_path, template_path=None):
         else:
             p.text = " "
         if p.runs:
-            set_font(p.runs[0], size=11, bold=True, color=WHITE)
+            if p.runs:
+                set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
     # Add Disclaimer below table
     disclaimer_top = Inches(1.5 + (0.4 * rows) + 0.3)
@@ -1424,7 +1470,8 @@ def generate_pptx(data, output_path, template_path=None):
         p = cell.text_frame.paragraphs[0]
         p.text = safe_text(header)
         p.alignment = PP_ALIGN.CENTER
-        set_font(p.runs[0], size=11, bold=True, color=WHITE)
+        if p.runs:
+            set_font(p.runs[0], size=11, bold=True, color=WHITE)
 
     for i, item in enumerate(skills_map[:rows2-1]):
         row_idx = i + 1
@@ -1436,7 +1483,8 @@ def generate_pptx(data, output_path, template_path=None):
             p = cell.text_frame.paragraphs[0]
             p.text = safe_text(val)
             p.alignment = PP_ALIGN.LEFT
-            set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
+            if p.runs:
+                set_font(p.runs[0], size=10, bold=(j == 0), color=CHARCOAL)
 
     # ----------------------------------------------------
     # HARDCODED "SAME TO SAME" ARCHITECTURE DIAGRAMS
@@ -1512,7 +1560,8 @@ def generate_pptx(data, output_path, template_path=None):
             for bp in bp_list:
                 p = tf_c.add_paragraph()
                 p.text = f"• {safe_text(bp)}"
-                set_font(p.runs[0], size=7.5, color=CHARCOAL)
+                if p.runs:
+                    set_font(p.runs[0], size=7.5, color=CHARCOAL)
                 p.space_after = Pt(2)
                 
             # Spacing
@@ -1532,7 +1581,8 @@ def generate_pptx(data, output_path, template_path=None):
             for ap in ap_list:
                 p = tf_c.add_paragraph()
                 p.text = f"• {safe_text(ap)}"
-                set_font(p.runs[0], size=7.5, color=CHARCOAL)
+                if p.runs:
+                    set_font(p.runs[0], size=7.5, color=CHARCOAL)
                 p.space_after = Pt(2)
             
             # Right Column Top: Technical Architecture Box
@@ -1637,7 +1687,8 @@ def generate_pptx(data, output_path, template_path=None):
             for tech in tech_list:
                 p = tf_tl.add_paragraph() if tf_tl.paragraphs[0].text else tf_tl.paragraphs[0]
                 p.text = f"• {safe_text(tech)}"
-                set_font(p.runs[0], size=7.0, color=CHARCOAL)
+                if p.runs:
+                    set_font(p.runs[0], size=7.0, color=CHARCOAL)
                 p.space_after = Pt(1)
                 
             # Right Column Bottom Right: Benefits / Outcome
@@ -1660,7 +1711,8 @@ def generate_pptx(data, output_path, template_path=None):
             for ben in ben_list:
                 p = tf_bl.add_paragraph() if tf_bl.paragraphs[0].text else tf_bl.paragraphs[0]
                 p.text = f"• {safe_text(ben)}"
-                set_font(p.runs[0], size=7.0, color=CHARCOAL)
+                if p.runs:
+                    set_font(p.runs[0], size=7.0, color=CHARCOAL)
                 p.space_after = Pt(1)
 
     # Slide 10: Thank You Slide
