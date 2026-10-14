@@ -21,13 +21,13 @@ LLM_STREAM = str(os.getenv("LLM_STREAM", "false")).lower() == "true"
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))
 LLM_NUM_CTX = int(os.getenv("LLM_NUM_CTX", "4096"))
 LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "30m")
-LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.15"))
-LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.9"))
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "60"))
 
-def query_llm(system_prompt, user_prompt, temperature=None, max_tokens=None, json_mode=False):
+def query_llm(system_prompt, user_prompt, temperature=None, max_tokens=None, json_mode=False, timeout=None):
     """
     Sends a chat completion request to the chosen LLM endpoint.
     """
+    req_timeout = timeout or LLM_TIMEOUT
     print(f"--- Using LLM in {MODE.upper()} mode ---")
     headers = {
         "Content-Type": "application/json"
@@ -146,7 +146,7 @@ def query_llm(system_prompt, user_prompt, temperature=None, max_tokens=None, jso
     try:
         start_time = time.time()
         # Enable stream parameter in requests if LLM_STREAM is true
-        response = requests.post(url_ollama, json=payload_ollama, headers=headers, stream=LLM_STREAM, timeout=300)
+        response = requests.post(url_ollama, json=payload_ollama, headers=headers, stream=LLM_STREAM, timeout=req_timeout)
         
         if response.status_code == 200:
             if LLM_STREAM:
@@ -211,7 +211,7 @@ def query_llm(system_prompt, user_prompt, temperature=None, max_tokens=None, jso
         payload_openai["response_format"] = {"type": "json_object"}
         
     try:
-        response = requests.post(url_openai, json=payload_openai, headers=headers, timeout=300)
+        response = requests.post(url_openai, json=payload_openai, headers=headers, timeout=req_timeout)
         if response.status_code == 200:
             res_json = response.json()
             

@@ -180,28 +180,44 @@ Ensure each screen contains meaningful components (stats_grid, action_card, acti
         return fallback
     return parsed
 
-def refine_screen_with_chat(current_schema, user_instruction):
-    """Refines or updates existing screen schema dynamically based on chatbot commands."""
+def refine_screen_with_chat(current_schema, user_instruction, image_data=None):
+    """Refines or updates existing screen schema dynamically based on chatbot commands and optional image references."""
+    image_clause = ""
+    if image_data:
+        image_clause = f"""
+An image/diagram reference was uploaded with this request. If the user refers to adding an image, visual mockup, or architecture screenshot, add or modify an "image" or "banner" component with realistic mock/uploaded properties:
+{{
+  "type": "image",
+  "props": {{
+    "title": "Uploaded Architecture Reference / Screenshot",
+    "image_url": "{image_data if isinstance(image_data, str) and image_data.startswith('http') else (image_data if isinstance(image_data, str) and image_data.startswith('data:') else '')}",
+    "caption": "Referenced UI wireframe from user upload"
+  }}
+}}
+"""
+
     refine_prompt = f"""Current Screen Schema:
 {json.dumps(current_schema, indent=2)}
 
 User Instruction:
 "{user_instruction}"
+{image_clause}
 
-Carefully modify the screen schema to fulfill the user's instructions.
-You can:
-- Add a new screen
-- Modify components inside existing screens
-- Add fields, metrics, or actions to existing screens
-- Change theme or supported devices
+Carefully modify the screen schema to fulfill the user's instructions immediately:
+- If asked to add a component, metric, button, table, or chart, add it to the active or relevant screen.
+- If asked to add an image or mockup, insert an "image" component.
+- If asked to add a new screen, append it to "screens".
+- If modifying fields/actions, update them directly in "props".
+- Ensure all names, labels, and text values are in professional English.
 
 Maintain the exact schema structure. Return ONLY valid JSON.
 """
     res = query_llm(
-        "You are a dynamic UI schema editor for an enterprise screen simulator. Output strictly valid JSON matching the schema.",
+        "You are an interactive UI schema editor for a real-time responsive screen simulator. Output strictly valid JSON matching the schema.",
         refine_prompt,
         temperature=0.2,
         max_tokens=4000,
         json_mode=True
     )
     return safe_json_loads(res, current_schema)
+

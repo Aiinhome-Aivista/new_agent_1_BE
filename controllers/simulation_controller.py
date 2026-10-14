@@ -39,8 +39,15 @@ def get_or_generate_screens(proposal_id):
             except Exception:
                 pass
 
-        # Generate new schema using Simulation Agent
-        extracted_schema = extract_screens_from_hla(req_text or "Enterprise Application Architecture", ir_data)
+        # Generate new schema using Simulation Agent with fallback safety
+        try:
+            extracted_schema = extract_screens_from_hla(req_text or "Enterprise Application Architecture", ir_data)
+        except Exception as gen_err:
+            print(f"[Simulation Screens] Generation failed: {gen_err}. Using default schema.")
+            extracted_schema = extract_screens_from_hla(None, ir_data)
+
+        if not extracted_schema or not isinstance(extracted_schema, dict) or not extracted_schema.get("screens"):
+            extracted_schema = extract_screens_from_hla(None, None)
         
         # Save back into DB
         cursor.execute("UPDATE proposals SET simulation_schema = %s WHERE id = %s", (json.dumps(extracted_schema), proposal_id))
@@ -65,6 +72,7 @@ def chat_simulation_refine():
         proposal_id = data.get('proposal_id')
         user_message = data.get('message')
         current_schema = data.get('current_schema')
+        image_data = data.get('image_data')  # base64 data url or image link
         
         if not proposal_id or not user_message:
             return error_response("Proposal ID and message are required", status_code=400)
@@ -85,7 +93,7 @@ def chat_simulation_refine():
         if not current_schema:
             current_schema = {"application_name": "Enterprise Solution", "screens": []}
             
-        updated_schema = refine_screen_with_chat(current_schema, user_message)
+        updated_schema = refine_screen_with_chat(current_schema, user_message, image_data=image_data)
         
         # Persist updated schema to DB
         cursor.execute("UPDATE proposals SET simulation_schema = %s WHERE id = %s", (json.dumps(updated_schema), proposal_id))
@@ -122,12 +130,23 @@ def reset_simulation_screens(proposal_id):
             except Exception:
                 pass
                 
-        new_schema = extract_screens_from_hla(req_text, ir_data)
+        try:
+            new_schema = extract_screens_from_hla(req_text, ir_data)
+        except Exception as llm_err:
+            print(f"[Simulation Reset] LLM screen generation failed: {llm_err}. Using guaranteed schema.")
+            from agents.simulation_agent import extract_screens_from_hla
+            new_schema = extract_screens_from_hla(None, ir_data)
+
+        if not new_schema or not isinstance(new_schema, dict) or not new_schema.get("screens"):
+            from agents.simulation_agent import extract_screens_from_hla
+            new_schema = extract_screens_from_hla(None, None)
+
         cursor.execute("UPDATE proposals SET simulation_schema = %s WHERE id = %s", (json.dumps(new_schema), proposal_id))
         conn.commit()
         
         return success_response(new_schema)
     except Exception as e:
+        print(f"[Simulation Reset] Critical error: {e}")
         return error_response(f"Failed to reset simulation screens: {str(e)}", status_code=500)
     finally:
         if cursor:
