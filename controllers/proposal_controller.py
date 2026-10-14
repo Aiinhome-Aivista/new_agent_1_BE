@@ -1,7 +1,8 @@
 import os
+import time
 import uuid
 import json
-from flask import request, send_file, jsonify
+from flask import request, send_file, jsonify, Response
 from database.db_connection import get_db_connection
 from agents.orchestrator import trigger_proposal_job, STEPS, update_step_status
 from utils.pptx_generator import generate_pptx
@@ -333,6 +334,67 @@ def get_proposal_status(proposal_id):
         
     except Exception as e:
         return error_response(f"Error retrieving job status: {str(e)}", status_code=500)
+
+
+def stream_proposal_status(proposal_id):
+    def generate():
+        while True:
+            try:
+                conn = get_db_connection()
+                cursor = conn.cursor(dictionary=True)
+                
+                cursor.execute("SELECT * FROM proposals WHERE id = %s", (proposal_id,))
+                proposal = cursor.fetchone()
+                
+                if not proposal:
+                    cursor.close()
+                    conn.close()
+                    yield f"data: {json.dumps({'error': 'Proposal not found'})}\n\n"
+                    break
+                    
+                cursor.execute("SELECT step_name, status, log_message, updated_at FROM proposal_steps WHERE proposal_id = %s ORDER BY id ASC", (proposal_id,))
+                steps = cursor.fetchall()
+                
+                cursor.close()
+                conn.close()
+                
+                if proposal.get("created_at"):
+                    proposal["created_at"] = format_datetime(proposal["created_at"])
+                    
+                formatted_steps = []
+                for step in steps:
+                    if step.get("updated_at"):
+                        step["updated_at"] = format_datetime(step["updated_at"])
+                    formatted_steps.append(step)
+                    
+                structured_ir = None
+                if proposal.get("structured_json_ir"):
+                    try:
+                        structured_ir = json.loads(proposal["structured_json_ir"])
+                    except:
+                        pass
+                        
+                data = {
+                    "proposal": proposal,
+                    "steps": formatted_steps,
+                    "structured_ir": structured_ir
+                }
+                
+                yield f"data: {json.dumps(data)}\n\n"
+                
+                if proposal["status"] in ["Complete", "Failed", "WaitingForTechSelection", "WaitingForRateConfirmation"]:
+                    break
+                    
+                time.sleep(1)
+            except Exception as e:
+                yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                break
+                
+    return Response(generate(), mimetype='text/event-stream', headers={
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+    })
+
 
 
 def pause_proposal_job(proposal_id):
