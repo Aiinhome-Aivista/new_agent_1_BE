@@ -12,6 +12,7 @@ from database.db_connection import init_db, get_db_connection
 import controllers.auth_controller as auth_controller
 import controllers.proposal_controller as proposal_controller
 import controllers.case_study_controller as case_study_controller
+import controllers.simulation_controller as simulation_controller
 from utils.api_response import success_response, error_response
 
 app = Flask(__name__)
@@ -428,6 +429,25 @@ def reindex_knowledge():
         return success_response({"message": f"Re-indexed {len(assets)} knowledge assets into RAG vector store"})
     except Exception as e:
         return error_response(str(e), status_code=500)
+
+# -------------------------------------------------------
+# SIMULATION / HLA SCREEN GENERATOR & COPILOT ENDPOINTS
+# -------------------------------------------------------
+
+@app.route('/api/simulation/<proposal_id>', methods=['GET'])
+def get_simulation_screens(proposal_id):
+    """Retrieve or dynamically extract HLA-based screens for the proposal."""
+    return simulation_controller.get_or_generate_screens(proposal_id)
+
+@app.route('/api/simulation/chat', methods=['POST'])
+def chat_simulation():
+    """Copilot interactive screen editing via conversational instructions."""
+    return simulation_controller.chat_simulation_refine()
+
+@app.route('/api/simulation/reset/<proposal_id>', methods=['POST'])
+def reset_simulation_screens(proposal_id):
+    """Reset and re-extract simulation screens from scratch."""
+    return simulation_controller.reset_simulation_screens(proposal_id)
 
 if __name__ == '__main__':
     # Initialize the database structures

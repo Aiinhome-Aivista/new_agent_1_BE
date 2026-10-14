@@ -127,6 +127,8 @@ def init_sqlite_db():
     except: pass
     try: cursor.execute("ALTER TABLE proposals ADD COLUMN last_transitioned_at TIMESTAMP NULL")
     except: pass
+    try: cursor.execute("ALTER TABLE proposals ADD COLUMN simulation_schema TEXT NULL")
+    except: pass
     
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS knowledge_assets (
@@ -248,6 +250,10 @@ def init_db():
             try: cursor.execute("ALTER TABLE proposals ADD COLUMN template_type VARCHAR(100) NULL")
             except mysql.connector.Error as err:
                 if err.errno != 1060: print(f"Migration error (template_type): {err}")
+                    
+            try: cursor.execute("ALTER TABLE proposals ADD COLUMN simulation_schema LONGTEXT NULL")
+            except mysql.connector.Error as err:
+                if err.errno != 1060: print(f"Migration error (simulation_schema): {err}")
                     
             conn.commit()
             print("MySQL database initialized successfully.")

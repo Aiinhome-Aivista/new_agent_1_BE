@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS proposals (
     additional_context LONGTEXT NULL,
     ppt_template_file VARCHAR(500) NULL,
     template_type VARCHAR(100) NULL,
+    simulation_schema LONGTEXT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
