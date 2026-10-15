@@ -22,6 +22,8 @@ LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "2048"))
 LLM_NUM_CTX = int(os.getenv("LLM_NUM_CTX", "4096"))
 LLM_KEEP_ALIVE = os.getenv("LLM_KEEP_ALIVE", "30m")
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "60"))
+LLM_TOP_P = float(os.getenv("LLM_TOP_P", "0.9"))
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
 
 def query_llm(system_prompt, user_prompt, temperature=None, max_tokens=None, json_mode=False, timeout=None):
     """
