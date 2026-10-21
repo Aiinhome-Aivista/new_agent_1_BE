@@ -73,10 +73,12 @@ def chat_simulation_refine():
         user_message = data.get('message')
         current_schema = data.get('current_schema')
         image_data = data.get('image_data')  # base64 data url or image link
+        active_screen_id = data.get('active_screen_id')
         
         if not proposal_id or not user_message:
             return error_response("Proposal ID and message are required", status_code=400)
             
+        print(f"[Simulation Chat] Proposal: {proposal_id}, Instruction: '{user_message}', Active Screen: '{active_screen_id}'")
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
@@ -93,7 +95,7 @@ def chat_simulation_refine():
         if not current_schema:
             current_schema = {"application_name": "Enterprise Solution", "screens": []}
             
-        updated_schema = refine_screen_with_chat(current_schema, user_message, image_data=image_data)
+        updated_schema = refine_screen_with_chat(current_schema, user_message, image_data=image_data, active_screen_id=active_screen_id)
         
         # Persist updated schema to DB
         cursor.execute("UPDATE proposals SET simulation_schema = %s WHERE id = %s", (json.dumps(updated_schema), proposal_id))
@@ -107,6 +109,7 @@ def chat_simulation_refine():
         })
         
     except Exception as e:
+        print(f"[Simulation Chat Error] Exception: {e}")
         return error_response(f"Failed to process chat refinement: {str(e)}", status_code=500)
 
 def reset_simulation_screens(proposal_id):
